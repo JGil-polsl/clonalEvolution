@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=61.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "microbialClonalEvolution"
+version = "1.0.3"
+authors = [
+  { name="Jarosław Gil", email="jaroslaw.gil@polsl.pl" },
+]
+description = "Project for simulation clonal evolution"
+
+readme = "README.md"
+license = { file="LICENSE" }
+requires-python = ">=3.9"
+classifiers = [
+    "Programming Language :: Python :: 3",
+	"License :: OSI Approved :: GNU Affero General Public License v3",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/JGil-polsl/Gillespie_Python"
+"Bug Tracker" = "https://github.com/JGil-polsl/Gillespie_Python/issues"
