@@ -6,12 +6,12 @@ Python software for simulating celluar/microbial clonal evolution with Gillespie
 
 The simpliest installation:
 ```
-python -m pip install microbialClonalEvolution
+python -m pip install clonalEvolution
 ```
 
 Usage in python:
 ```
-from microbialClonalEvolution import mainView
+from clonalEvolution import mainView
 mainView.run()
 ```
 
