@@ -1,16 +1,3 @@
-import PyQt5.QtWidgets as qtWidget
-import PyQt5.QtGui as qtGui
-from PyQt5.QtCore import Qt
-import sys
-import pandas as pd
-import numpy as np
-
-disclaimer = '''Cellular/Microbial Clonal Evolution simulations basing on Gillespie algorithm. Copyright (C) 2022 by Jarosław Gil. 
-    This program comes with ABSOLUTELY NO WARRANTY; for details type `show w'.
-    This is free software, and you are welcome to redistribute it
-    under certain conditions; type `show c' for details.'''
-
-
 '''
     Cellular/Microbial Clonal Evolution simulations basing on Gillespie algorithm.
     Copyright (C) 2022 by Jarosław Gil
@@ -29,16 +16,29 @@ disclaimer = '''Cellular/Microbial Clonal Evolution simulations basing on Gilles
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 '''
 
+import PyQt5.QtWidgets as qtWidget
+import PyQt5.QtGui as qtGui
+from PyQt5.QtCore import Qt
+import sys
+import pandas as pd
+import numpy as np
+
+disclaimer = '''Cellular/Microbial Clonal Evolution simulations basing on Gillespie algorithm. Copyright (C) 2022 by Jarosław Gil. 
+    This program comes with ABSOLUTELY NO WARRANTY; for details type `show w'.
+    This is free software, and you are welcome to redistribute it
+    under certain conditions; type `show c' for details.'''
+
+
 from pathlib import Path 
 import time
 import matplotlib.pyplot as plt
-import microbialClonalEvolution.clonal_evolution_init as CEML 
+import clonal_evolution_init as CEML 
 from threading import Thread
 from queue import Queue
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 import copy
-import microbialClonalEvolution.external_plots as external_plots
+import external_plots as external_plots
 
 class mainFormat(qtWidget.QWidget):
     def __init__(self, parent=None):

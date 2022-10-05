@@ -170,6 +170,42 @@ def binnedHist(path_in, path_out):
     df = loadFile(path_in)
     
     ##TODO whole population VAF
+    vaf_data = []
+    uniq_muts = []
+    freq = []
+    clones = []
+    for row in df.iterrows():
+        x = row[1]['Passener mutation list']
+        for mut in x:
+            if mut not in uniq_muts:
+                uniq_muts.append(mut)
+                freq.append(1)
+            else:
+                freq[uniq_muts.index(mut)] = freq[uniq_muts.index(mut)]+1
+    
+        x = row[1]['Driver mutation list']
+        for mut in x:
+            if mut not in uniq_muts:
+                uniq_muts.append(mut)
+                freq.append(row[1]['Cells number'])
+            else:
+                freq[uniq_muts.index(mut)] = freq[uniq_muts.index(mut)]+row[1]['Cells number']
+    
+    freq = np.array(freq)/popSize
+    freq = freq.tolist()
+    
+    freq = pd.Series(freq)
+    ax = freq.plot.hist(bins=101, ylim=(0,50), xlim=(-0.1,1.1), title=("Clone ID: %s, Population: %i" % ('None', popSize)))
+    fig = ax.get_figure()
+    try:
+        os.makedirs(path_out, exist_ok=True) 
+    except OSError as error:
+        print(error)
+    finally:
+        if os.path.exists(path_out + "clone_mutations_VAF.jpg"):
+            os.remove(path_out + "clone_mutations_VAF.jpg")
+        fig.savefig(path_out + "clone_mutations_VAF.jpg")
+        plt.close(fig)
     
     popSize = sum(df['Cells number'])
     b = 0

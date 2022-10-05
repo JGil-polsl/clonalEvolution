@@ -23,9 +23,9 @@ import os
 import pandas as pd
 from pathlib import Path  
 from threading import Thread
-import microbialClonalEvolution.clonal_evolution_binned_loop as CEBL
-import microbialClonalEvolution.clonal_evolution_loop as CEL
-from microbialClonalEvolution.wmean import wmean as wm
+import clonal_evolution_binned_loop as CEBL
+import clonal_evolution_loop as CEL
+from wmean import wmean as wm
 
 end = False
     
