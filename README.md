@@ -15,6 +15,15 @@ from microbialClonalEvolution import mainView
 mainView.run()
 ```
 
+Usage from console:
+```
+python -m clonalEvolution 
+#   for simply run graphic verion of software
+
+python -m clonalEvolution -h
+#   to see instructions for command line parametrization
+``` 
+
 # Usage Instructions
 
 ## General Tab: 

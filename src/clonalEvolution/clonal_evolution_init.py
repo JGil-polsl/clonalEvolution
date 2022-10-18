@@ -23,9 +23,10 @@ import os
 import pandas as pd
 from pathlib import Path  
 from threading import Thread
-import clonal_evolution_binned_loop as CEBL
-import clonal_evolution_loop as CEL
-from wmean import wmean as wm
+
+import clonalEvolution.clonal_evolution_binned_loop as CEBL
+import clonalEvolution.clonal_evolution_loop as CEL
+import clonalEvolution.wmean as wm
 
 end = False
     
@@ -268,7 +269,7 @@ def plotter(plots, iPop, file_name, file_localization, iter_outer, select):
                                                         'Mutations_effect': [row[4] for row in iPop],
                                                         'Parent clone': [row[5] for row in iPop]
                                                     }),  
-                                                  file_localization, file_name, iter_outer))
+                                                  file_localization, file_name + "_single", iter_outer, '.csv'))
             tsf.start()
             
     elif select == 1:
@@ -346,13 +347,13 @@ def clonalEvolutionMainLoop(iPop, params, file_name="", file_description="", fil
     t = time.time()
     
     if select == 0 and begin and plots & 16:
-        # if not os.path.exists(file_localization + '\\' + file_name + "_muller_plot_single_data.txt"):
-            
+        os.makedirs(file_localization, exist_ok=True) 
         FILE = open(file_localization + '\\' + file_name + "_muller_plot_single_data.txt", 'w')
         FILE.write("clone, cells, previous clone")
         FILE.write('\n')
         FILE.close()
-    elif select == 1 and begin and plots & 16:
+    elif select == 1 and begin and plots & 16:        
+        os.makedirs(file_localization, exist_ok=True) 
         FILE = open(file_localization + '\\' + file_name + "_muller_plot_binned_data.txt", 'w')
         FILE.write("clone, cells, previous clone")
         FILE.write('\n')
@@ -401,14 +402,15 @@ def clonalEvolutionMainLoop(iPop, params, file_name="", file_description="", fil
             
             iter_outer = iter_outer + 1            
             t = time.time()
-        
-        if iter_outer % steps == 0:
-            print("pointer")
+
+        print_time = not iter_inner % round(cycle/skip)        
+        # if iter_outer % steps == 0:
+        #     print("pointer")
         
         if select == 0:            
             iPop = CEL.clonalEvolutionLoop(iPop, cap, tau, mut_prob, mut_effect, resume, q, threads)
         elif select == 1:
-            iPop = CEBL.clonalEvolutionBinnedLoop(iPop, cap, tau, mut_prob, mut_effect, resume, q, threads)
-            
+            iPop = CEBL.clonalEvolutionBinnedLoop(iPop, cap, tau, mut_prob, mut_effect, resume, q, threads, print_time)
+           
         resume = 0
         iter_inner = iter_inner + 1

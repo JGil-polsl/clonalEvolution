@@ -9,11 +9,11 @@ https://github.com/pypa/sampleproject
 from setuptools import setup, find_packages
 import pathlib
 
-here = pathlib.Path(__file__).parent.resolve()
+here = pathlib.Path(__file__).parent
 
 # Get the long description from the README file
-long_description = (here / "README.md").read_text(encoding="utf-8")
-
+long_description = (here / "README.md").read_text(encoding=("utf-8"))
+print(long_description)
 # Arguments marked as "Required" below must be included for upload to PyPI.
 # Fields marked as "Optional" may be commented out.
 
@@ -22,11 +22,13 @@ setup(
     # specification here:
     # https://packaging.python.org/specifications/core-metadata/#name
     name="clonalEvolution", 
-    version="0.9.0",
+    version="1.0.3",
     description="Software for simulating clonal evolution in binned and tau leap version.",
     url="https://github.com/JGil-polsl/clonalEvolution",
     author="Jaroslaw Gil",  
     author_email="jaroslaw.gil@polsl.pl",
+    long_description=long_description,
+    long_description_content_type='text/markdown',
     # Classifiers help users find your project by categorizing it.
     #
     # For a list of valid classifiers, see https://pypi.org/classifiers/
@@ -70,7 +72,7 @@ setup(
     # executes the function `main` from this package when invoked:
     entry_points={ 
         "console_scripts": [
-            "clonaEvolution=mainView:run",
+            "clonaEvolution=__main__:main",
         ],
     },
     # List additional URLs that are relevant to your project as a dict.

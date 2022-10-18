@@ -15,7 +15,7 @@
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 '''
-
+import time
 import numpy as np
 import math
 import random
@@ -27,42 +27,70 @@ tCLONE = 0
 semafor_1 = False
 semafor_2 = False
 semafor_3 = False
+
+tx = [0,0,0,0]
+ty = [0,0,0,0]
+
+#idea: kalkulowac na raz wszystkie komorki umierajace i dzielace sie (mutacje) sum poisson, prob and random select
     
-def division(i, divide, m_list):
-    if divide > 0:
+def division(i, divide, m_list): # copy mutation in passanger mutation list
+    if divide > 0 and i[5]:
         passanger_divide = []
         if m_list:
+            uni = np.unique(i[5]) # select only unique mutations ids (two same mutations cannot happen in one cell)
+            prob = np.bincount(i[5])
+            prob = prob[prob!=0]/len(i[5])
             for x in range(divide):
-                mut = math.floor(i[3]) + np.random.binomial(1,i[3]-math.floor(i[3]),1)[0] ## calculate number of mutations duplicate
+                mut = np.random.poisson(i[3])#math.floor(i[3]) + np.random.binomial(1,i[3]-math.floor(i[3]),1)[0] ## calculate number of mutations duplicate
                 new_muts = []
-                if mut >= len(i[5]): ## check if duplicate is greater than mutation list length
-                    mut = len(i[5]) 
+                if mut >= len(uni): ## check if duplicate is greater than mutation list length
+                    mut = len(uni)
                 try:
-                    new_muts = random.sample(i[5], k=mut) ## select random mutations to duplicate
+                    new_muts = np.random.choice(uni, size=mut, replace=False, p=prob) ## select random mutations to duplicate
                 except IndexError as error:
+                    continue
+                except ValueError:
+                    print("no mutation")
                     continue
                 passanger_divide.extend(new_muts)
             i[5].extend(passanger_divide) ## add duplicates to mutation list
-            i[3] = round((len(i[5]))/i[1],7) ## calculate new mean mutation number
+            try:
+                i[3] = round((len(i[5]))/i[1],7) ## calculate new mean mutation number
+            except:
+                i[3] = 0
         else:
             mut = divide*math.floor(i[3]) + sum(np.random.binomial(1,i[3]-math.floor(i[3]),divide))
             i[3] = round(((i[1]-divide)*i[3] + mut)/i[1],7)
     return
 
-def dying(i, death, m_list):
-    if death > 0: ## check if list consider all dying cells to have maksimum mutate number 
+def dying(i, death, m_list): # delete dying mutations from passanger mutation list
+    if death > 0 and i[5]: ## check if list consider all dying cells to have maksimum mutate number 
         if m_list:
+            uni = np.unique(i[5]) # select only unique mutations ids (two same mutations cannot happen in one cell)
+            freq = np.bincount(i[5])
+            freq = freq[freq != 0]
             for y in range(death):
-                mut = math.floor(i[3]) + np.random.binomial(1,i[3]-math.floor(i[3]),1)[0] ## calculate mutation number to erease
-                if mut >= len(i[5]): ## check if mutation to erease is greater than mutation list length
-                    mut = len(i[5])
+                mut = np.random.poisson(i[3])#math.floor(i[3]) + np.random.binomial(1,i[3]-math.floor(i[3]),1)[0] ## calculate mutation number to erease
+                prob = freq/len(i[5])
+                if mut >= len(uni): ## check if mutation to erease is greater than mutation list length
+                    mut = len(uni)
                 try:
-                    passenger_death = random.sample(i[5], k=mut) ## select random mutation from mutation list
+                    passenger_death = np.random.choice(uni, size=mut, replace=False, p=prob) ## select random mutation from mutation list
                     for x in passenger_death:
                         i[5].remove(x) ## remove mutation
+                        freq[uni == x] = freq[uni == x] - 1
+                        # if freq[uni == x] == 0:
+                        #     uni = uni[uni != x]
+                        #     freq = freq[freq != 0]
                 except IndexError as error:
                     continue
-            i[3] = round((len(i[5]))/i[1],7) ## calculate new mean mutation number
+                except ValueError:
+                    print("no mutation")
+                    continue
+            try:
+                i[3] = round((len(i[5]))/i[1],7) ## calculate new mean mutation number
+            except:
+                i[3] = 0
         else:
             mut = death*math.floor(i[3]) + sum(np.random.binomial(1,i[3]-math.floor(i[3]),death))
             i[3] = round(((i[1]+death)*i[3] - mut)/i[1],7)
@@ -82,7 +110,10 @@ def newMutation(i, m_p, mut_effect, m_list):
             semafor_1 = True
             MUTATION_ID = MUTATION_ID + m_p ## update mutation ID
             semafor_1 = False
-            i[3] = round((len(i[5]))/i[1],7) ## calculate new mean mutation number
+            try:
+                i[3] = round((len(i[5]))/i[1],7) ## calculate new mean mutation number
+            except:
+                i[3] = 0
         else:
             i[3] = round(((i[1]-m_p)*i[3] + m_p)/i[1],7)
     return
@@ -91,7 +122,7 @@ def newClone(i, m_d, iPop, mut_effect, m_list):
     global CLONE_ID, MUTATION_ID, semafor_1, semafor_2
     for x in range(CLONE_ID, CLONE_ID + m_d):
         if m_list:
-            mut = math.floor(i[3]) + np.random.binomial(1,i[3]-math.floor(i[3]),1)[0]  ## calulate mutation number to copy to new clone
+            mut = np.random.poisson(i[3])#math.floor(i[3]) + np.random.binomial(1,i[3]-math.floor(i[3]),1)[0]  ## calulate mutation number to copy to new clone
             driver = i[4].copy() ## copy list of driver mutations (all are included in new clone)              
             driver.append(MUTATION_ID) ## add new mutation ID to driver mutation list
             while semafor_1:
@@ -100,14 +131,20 @@ def newClone(i, m_d, iPop, mut_effect, m_list):
             MUTATION_ID = MUTATION_ID + 1 ## update mutation ID
             semafor_1 = False
             passenger = [] 
-            if mut >= len(i[5]):
-                mut = len(i[5])
+            uni = np.unique(i[5]) # select only unique mutations ids (two same mutations cannot happen in one cell)
+            prob = np.bincount(i[5])
+            prob = prob[prob!=0]/len(i[5])
+            if mut >= len(uni):
+                mut = len(uni)
             try:
-                passenger = random.sample(i[5], k=mut) ## select random mutations to copy
+                passenger = np.random.choice(uni, size=mut, replace=False, p=prob) ## select random mutations to copy
             except IndexError as error:
                 iPop.append([x, 1, i[2]*(1+mut_effect[0]), 0, driver, [], i[0]]) ## append new clone to population
                 continue
-            iPop.append([x, 1, i[2]*(1+mut_effect[0]), len(passenger), driver, passenger, i[0]]) ## append new clone to population
+            except ValueError:
+                iPop.append([x, 1, i[2]*(1+mut_effect[0]), 0, driver, [], i[0]]) ## append new clone to population
+                continue
+            iPop.append([x, 1, i[2]*(1+mut_effect[0]), len(passenger), driver, passenger.tolist(), i[0]]) ## append new clone to population
         else:
             iPop.append([x, 1, i[2]*(1+mut_effect[0]), i[3], i[4].copy(), [], i[0]])
     while semafor_2:
@@ -116,7 +153,8 @@ def newClone(i, m_d, iPop, mut_effect, m_list):
     CLONE_ID = CLONE_ID + m_d ## update clone ID
     semafor_2 = False
 
-def main_loop(iPop, index, mdt, popSize, tau, mut_prob, mut_effect):
+def main_loop(iPop, index, mdt, popSize, tau, mut_prob, mut_effect, print_time):
+    global tx, ty, CLONE_ID
     m_list = True
     x = [l for l in range(index[0],index[1])]
     for l in x:
@@ -142,20 +180,40 @@ def main_loop(iPop, index, mdt, popSize, tau, mut_prob, mut_effect):
         
         ## clone size
         iPop[l][1] = iPop[l][1] - death + divide
-                      
+        
+
+        time_t = time.time()             
         ## dying cells
         dying(iPop[l], death, m_list)
-                
+          
+        tx[0] = tx[0] + (time.time() - time_t) 
+        ty[0] = ty[0] + 1
+        time_t = time.time()     
         ## new clones
         newClone(iPop[l], m_d, iPop, mut_effect, m_list)
         
+        tx[1] = tx[1] + (time.time() - time_t) 
+        ty[1] = ty[1] + 1
+        time_t = time.time()     
         ## division
         division(iPop[l], divide, m_list)
         
+        tx[2] = tx[2] + (time.time() - time_t) 
+        ty[2] = ty[2] + 1
+        time_t = time.time()     
         ## mean fitness
         newMutation(iPop[l], m_p, mut_effect, m_list)
+        
+        tx[3] = tx[3] + (time.time() - time_t) 
+        ty[3] = ty[3] + 1
+        time_t = time.time()     
+        
+        if print_time:
+            print("Clone ID: %i, Dying: %.2f, newClone: %.2f, Division: %.2f, newMutation: %.2f" % (CLONE_ID,tx[0]/ty[0],tx[1]/ty[1],tx[2]/ty[2],tx[3]/ty[3]))
+            tx = [0,0,0,0]
+            ty = [0,0,0,0]
 
-def clonalEvolutionBinnedLoop(iPop, cap, tau, mut_prob, mut_effect, resume, q, THREADS):
+def clonalEvolutionBinnedLoop(iPop, cap, tau, mut_prob, mut_effect, resume, q, THREADS, print_time):
     """
     Assumption:
         Clone after obtaining mean mutation number than one have no one cell without mutation (same for 2,3,4 etc.)
@@ -184,6 +242,20 @@ def clonalEvolutionBinnedLoop(iPop, cap, tau, mut_prob, mut_effect, resume, q, T
     mdt = popSize/cap
     # mdt = math.log(1 + (math.e - 1)*popSize/cap)
     
+    if resume:
+        m_max = 0
+        c_max = 0
+        for row in iPop:
+            if row[4] and row[5]:
+                if(max(row[4]) > m_max):
+                    m_max = max(row[4])
+                if(max(row[5]) > m_max):
+                    m_max = max(row[5])
+            if row[0] > c_max:
+                c_max = row[0]
+        MUTATION_ID = m_max + 1
+        CLONE_ID = c_max + 1
+    
     up = len(iPop)
     
     th = math.ceil(up/THREADS)
@@ -193,8 +265,9 @@ def clonalEvolutionBinnedLoop(iPop, cap, tau, mut_prob, mut_effect, resume, q, T
     develop = []
     
     for i in range(len(idx)):
-        develop.append(Thread(target=main_loop, args=(iPop, idx[i], mdt, popSize, tau, mut_prob, mut_effect)))
+        develop.append(Thread(target=main_loop, args=(iPop, idx[i], mdt, popSize, tau, mut_prob, mut_effect, print_time)))
         develop[i].start()
+        # main_loop(iPop, idx[i], mdt, popSize, tau, mut_prob, mut_effect)
         
     for i in develop:
         i.join()

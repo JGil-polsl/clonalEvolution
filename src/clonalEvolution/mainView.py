@@ -22,6 +22,7 @@ from PyQt5.QtCore import Qt
 import sys
 import pandas as pd
 import numpy as np
+import re
 
 disclaimer = '''Cellular/Microbial Clonal Evolution simulations basing on Gillespie algorithm. Copyright (C) 2022 by Jarosław Gil. 
     This program comes with ABSOLUTELY NO WARRANTY; for details type `show w'.
@@ -32,13 +33,13 @@ disclaimer = '''Cellular/Microbial Clonal Evolution simulations basing on Gilles
 from pathlib import Path 
 import time
 import matplotlib.pyplot as plt
-import clonal_evolution_init as CEML 
+import clonalEvolution.clonal_evolution_init as CEML 
 from threading import Thread
 from queue import Queue
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 import copy
-import external_plots as external_plots
+import clonalEvolution.external_plots as external_plots
 
 class mainFormat(qtWidget.QWidget):
     def __init__(self, parent=None):
@@ -165,17 +166,19 @@ class mainFormat(qtWidget.QWidget):
         index = 0
         if msg == "exit":
             try:
-                index = self.s_ID.index(int(ID))
-                self.s_ID.remove(int(ID))
+                temp = list(map(lambda x: (x.split(',')[0]), self.s_ID))
+                index = temp.index(str(ID))
+                self.s_ID.remove(self.s_ID[index])
                 self.th_s[index].join()
                 self.th_s.remove(self.th_s[index])
-                self.idx_s = self.idx_s - 1
+                # self.idx_s = self.idx_s - 1
             except:
-                index = self.r_ID.index(int(ID))
-                self.r_ID.remove(int(ID))
+                temp = list(map(lambda x: (x.split(',')[0]), self.r_ID))
+                index = temp.index(str(ID))
+                self.r_ID.remove(self.r_ID[index])
                 self.th_r[index].join()
                 self.th_r.remove(self.th_r[index])
-                self.idx_r = self.idx_r - 1
+                # self.idx_r = self.idx_r - 1
             
             self.status.setText("Stopped")
             if not self.th_r and not self.th_s:
@@ -245,7 +248,7 @@ class mainFormat(qtWidget.QWidget):
         
     def mullerPlotAction(self):
         try:
-            if self._file_path == "":
+            if self._file_path.text() == "":
                 raise Exception()
             if self._th_muller:
                 raise NameError()
@@ -255,14 +258,18 @@ class mainFormat(qtWidget.QWidget):
         except:
             self.showDialog("Enter save path", "Alert")
             return
-        fname = qtWidget.QFileDialog.getOpenFileName(self, 'Open file', "Z://","CSV files (*.csv, *.txt)")[0]   
-        self._th_muller.append(Thread(target=external_plots.mullerPlot, args=(fname, self._file_path.text())))
+        fname = qtWidget.QFileDialog.getOpenFileName(self, 'Open file', "Z://","CSV files (*.csv, *.txt)")[0]  
+        if fname == "":
+            self.showDialog("No file selected!", "Alert")
+            return
+        self._th_muller.append(Thread(target=external_plots.mullerPlot, args=(fname, self._file_path.text() + "\\Figures")))
+        # external_plots.mullerPlot(fname, self._file_path.text() + "\\Figures")
         self._th_muller[0].start()
         self.status.setText("muller plot ongoing")
         
     def cloneHistAction(self):
         try:
-            if self._file_path == "":
+            if self._file_path.text() == "":
                 raise Exception()
             if self._th_hist:
                 raise NameError()
@@ -272,13 +279,19 @@ class mainFormat(qtWidget.QWidget):
         except:
             self.showDialog("Enter save path", "Alert")
             return
-        fname = qtWidget.QFileDialog.getOpenFileName(self, 'Open file', "Z://","CSV files (*.csv, *.txt)")[0] 
+        fname = qtWidget.QFileDialog.getOpenFileName(None, 'Open file', "Z://","CSV files (*.csv);; Text files (*.txt)")[0] 
+        if fname == "":
+            self.showDialog("No file selected!", "Alert")
+            return
+        name_id = re.findall('\d+', fname)[-1]
         if fname.endswith('.txt'):
-            self._th_hist.append(Thread(target=external_plots.binnedHist, args=(fname, self._file_path.text())))
+            self._th_hist.append(Thread(target=external_plots.binnedHist, args=(fname, self._file_path.text() + "\\Figures\\" + str(name_id))))
+            # external_plots.binnedHist(fname, self._file_path.text() + "\\Figures\\" + str(name_id))
             self._th_hist[0].start()
             self.status.setText("mutations histograms ongoing")
         elif fname.endswith('.csv'):
-            self._th_hist.append(Thread(target=external_plots.singleHist, args=(fname, self._file_path.text())))
+            self._th_hist.append(Thread(target=external_plots.singleHist, args=(fname, self._file_path.text() + "\\Figures\\" + str(name_id))))
+            # external_plots.singleHist(fname, self._file_path.text() + "\\Figures\\" + str(name_id))
             self._th_hist[0].start()
             self.status.setText("mutations histograms ongoing")
         else:
@@ -538,9 +551,9 @@ class mainFormat(qtWidget.QWidget):
             return
         
         try:
-            if self._file_name == "" and self._sx.isChecked():
+            if self._file_name.text() == "" and self._sx.isChecked():
                 raise Exception()
-            if self._file_path == "" and self._sx.isChecked():
+            if self._file_path.text() == "" and self._sx.isChecked():
                 raise Exception()
         except:
             self.showDialog("Enter save localization and name", "Alert")
@@ -564,7 +577,8 @@ class mainFormat(qtWidget.QWidget):
                   self._file_name.text(), 
                   self._file_desc.text(), 
                   self._file_path.text(), plots, 0, self.q, self.ID, 1)))
-
+            self.s_ID.append(str(self.ID) + ", binned")
+            
         else:        
             iMuts = np.zeros(pop, dtype=np.int64).tolist()
             iProp = np.ones(pop).tolist()
@@ -585,20 +599,27 @@ class mainFormat(qtWidget.QWidget):
                                                         copy.deepcopy([pop, cap, steps, tau, skip, mut_prob, mut_effect, threads]), 
                                                         self._file_name.text(), 
                                                         self._file_desc.text(), 
-                                                        self._file_path.text(), plots, 0, self.q, self.ID, 0)))    
+                                                        self._file_path.text(), plots, 0, self.q, self.ID, 0)))               
+            self.s_ID.append(str(self.ID) + ", single")
             
-        self.s_ID.append(str(self.ID))
         self.ID = self.ID + 1
         self.th_s[self.idx_s].start()
         self.idx_s = self.idx_s + 1
        
     def resume(self):
+        self.showPromptParams()
+        fname = qtWidget.QFileDialog.getOpenFileName(self, 'Open file', "Z://","Data Files (*.csv, *.txt)")[0]       
+        if fname == "":
+            self.showDialog("No file selected!", "Alert")
+            return
+        self.loadPaths(fname)
+        
         try:
             pop = int(self._population.text())
-            cap = int(self._population.text())
-            steps = int(self._population.text())
-            tau = float(self._population.text())
-            skip = float(self._population.text())
+            cap = int(self._capacity.text())
+            steps = int(self._steps.text())
+            tau = float(self._tau.text())
+            skip = float(self._skip.text())
             mut_prob = self._mut_prob.text().split(',')
             mut_prob = [float(x.strip('[]')) for x in mut_prob]
             mut_effect = self._mut_effect.text().split(',')
@@ -606,11 +627,7 @@ class mainFormat(qtWidget.QWidget):
             threads = int(self._threads.text())
         except:
             self.showDialog("Type correct parameters","Alert")
-            return        
-        
-        self.showPromptParams()
-        fname = qtWidget.QFileDialog.getOpenFileName(self, 'Open file', "Z://","Data Files (*.csv, *.txt)")[0]       
-        self.loadPaths(fname)
+            return            
         
         plots = 1*self._mw.isChecked() + \
                 2*self._fw.isChecked() + \
@@ -643,8 +660,8 @@ class mainFormat(qtWidget.QWidget):
                                                         copy.deepcopy([pop, cap, steps, tau, skip, mut_prob, mut_effect, threads]), 
                                                         self._file_name.text(), 
                                                         self._file_desc.text(), 
-                                                        self._file_path.text(), plots, self._last_cycle+1, self.q, self.ID, 1)))
-
+                                                        self._file_path.text(), plots, self._last_cycle + 1, self.q, self.ID, 1)))
+            self.r_ID.append(str(self.ID) + ", binned")
         else:
             df = pd.read_csv(fname)
             iMuts = df['Mutations'].tolist()
@@ -678,8 +695,9 @@ class mainFormat(qtWidget.QWidget):
                                                        copy.deepcopy(self.params).append(threads), 
                                                        self._file_name.text(), 
                                                        self._file_desc.text(), 
-                                                       self._file_path.text(), plots, self._last_cycle+1, self.q, self.ID, 0)))            
-        self.r_ID.append(str(self.ID))
+                                                       self._file_path.text(), plots, self._last_cycle + 1, self.q, self.ID, 0)))            
+            self.r_ID.append(str(self.ID) + ", single")
+            
         self.ID = self.ID + 1
         self.th_r[self.idx_r].start()
         self.idx_r = self.idx_r + 1     
@@ -706,10 +724,11 @@ class mainFormat(qtWidget.QWidget):
            self.loadParams()
            
     def loadParams(self):
-        fname = qtWidget.QFileDialog.getOpenFileName(self, 'Load simulation parameters', "Z://","CSV files (*.csv)")        
-        if not fname[0]:
+        fname = qtWidget.QFileDialog.getOpenFileName(self, 'Load simulation parameters', "Z://","CSV files (*.csv)")[0]        
+        if fname == "":
+            self.showDialog("No file selected!", "Alert")
             return
-        df = pd.read_csv(fname[0])
+        df = pd.read_csv(fname)
         
         pop = df['pop'][0]
         cap = df['cap'][0]
@@ -772,6 +791,11 @@ class mainFormat(qtWidget.QWidget):
                     name = i.rstrip('_' + str(self._last_cycle) + '.txt')
             else:
                 path = path + i + '\\'
+        
+        if name.endswith("_binned"):
+            name = name.rstrip("_binned")
+        else:
+            name = name.rstrip("_single")
         self._file_name.setText(name)
         self._file_path.setText(path)  
         self._file_desc.setText(str(self._last_cycle) + " - last cycle, starting with +1")                    
@@ -783,5 +807,3 @@ def run():
     ret = app.exec_()
     sys.exit(ret) 
 
-if __name__ == "__main__":
-    run()

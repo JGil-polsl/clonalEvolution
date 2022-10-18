@@ -20,6 +20,7 @@ import numpy as np
 import os
 from pathlib import Path
 import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
 
 def mullerPlot(path_in, path_out):   
     '''
@@ -169,45 +170,103 @@ def binnedHist(path_in, path_out):
     
     df = loadFile(path_in)
     
+    pass_m_l = []
+    driv_m_l = []
+    
+    for row in df.iterrows():
+        pass_m_l.extend(row[1]["Passener mutation list"])
+        driv_m_l.extend(row[1]["Driver mutation list"])
+    
+    pass_m_l = np.unique(pass_m_l)
+    driv_m_l = np.unique(driv_m_l)
+    
     ##TODO whole population VAF
     vaf_data = []
-    uniq_muts = []
-    freq = []
+    uniq_muts = pass_m_l.tolist()
+    uniq_muts.extend(driv_m_l.tolist())
+    
+    freq_p = np.zeros([len(df), len(uniq_muts)]).tolist()
     clones = []
+    row_idx = 0
     for row in df.iterrows():
         x = row[1]['Passener mutation list']
         for mut in x:
-            if mut not in uniq_muts:
-                uniq_muts.append(mut)
-                freq.append(1)
-            else:
-                freq[uniq_muts.index(mut)] = freq[uniq_muts.index(mut)]+1
+            freq_p[row_idx][uniq_muts.index(mut)] = freq_p[row_idx][uniq_muts.index(mut)]+1
     
         x = row[1]['Driver mutation list']
         for mut in x:
-            if mut not in uniq_muts:
-                uniq_muts.append(mut)
-                freq.append(row[1]['Cells number'])
-            else:
-                freq[uniq_muts.index(mut)] = freq[uniq_muts.index(mut)]+row[1]['Cells number']
+            freq_p[row_idx][uniq_muts.index(mut)] = freq_p[row_idx][uniq_muts.index(mut)]+row[1]['Cells number']
+        row_idx = row_idx + 1
+                
+    popSize = sum(df['Cells number'])
     
-    freq = np.array(freq)/popSize
+    freq = []
+    for row in range(len(freq_p)):
+        freq.append([])
+        freq_t = np.array(freq_p[row])/popSize
+        freq[row] = freq_t
+    t = np.sum(freq, axis=0)
+
+    for row in range(len(freq)):
+        freq[row] = np.around(freq[row]/t,decimals=3).tolist()
+        
+    freq.append([])
+    freq[len(freq)-1] = t.tolist()    
+
+    freq = np.array(freq)
+    freq = freq.T
+    freq = freq[np.argsort(freq[:,len(freq[1,:])-1])]
     freq = freq.tolist()
     
-    freq = pd.Series(freq)
-    ax = freq.plot.hist(bins=101, ylim=(0,50), xlim=(-0.1,1.1), title=("Clone ID: %s, Population: %i" % ('None', popSize)))
-    fig = ax.get_figure()
-    try:
-        os.makedirs(path_out, exist_ok=True) 
-    except OSError as error:
-        print(error)
-    finally:
-        if os.path.exists(path_out + "clone_mutations_VAF.jpg"):
-            os.remove(path_out + "clone_mutations_VAF.jpg")
-        fig.savefig(path_out + "clone_mutations_VAF.jpg")
-        plt.close(fig)
+    bar_x = [x/200 for x in range(0,201)]
+    bar_plot = np.zeros([len(freq[0]) - 1,len(bar_x)])
+    idx_bar = 1
+    for i in freq:
+        while i[len(i)-1] > bar_x[2*idx_bar]:
+            idx_bar = idx_bar + 1
+        for t in range(len(i)-1):
+            bar_plot[t,2*idx_bar-1] = bar_plot[t,2*idx_bar-1] + i[t]
+
+    bar_plot = bar_plot.tolist()
+    bar_plot.append(bar_x)
+    bar_plot = np.array(bar_plot)
+    bar_plot = bar_plot.T
     
-    popSize = sum(df['Cells number'])
+    bar_plot = pd.DataFrame(bar_plot)
+    temp = []
+    for row in df.iterrows():
+        temp.append(str(row[1]['Clone number']))
+    temp.append('id')
+    bar_plot.columns = temp
+
+    for x in range(0,2):
+
+        ax = bar_plot.plot.bar(x='id', stacked=True, legend=False, width = 2, figsize=(40,20))
+        if x == 0:
+            ax.set_ylim(0,100)
+        ax.set_xlabel("VAF", labelpad=50, fontdict={'fontsize':50})
+        ax.set_ylabel("Frequency", labelpad=50, fontdict={'fontsize':50})
+        ax.set_title("Population VAF, Population: %i" % popSize, pad=50, fontdict={'fontsize':70})
+        ax.xaxis.set_major_locator(ticker.MultipleLocator(20))
+        ax.xaxis.set_minor_locator(ticker.MultipleLocator(2))
+        for tick in ax.xaxis.get_major_ticks():
+            tick.label.set_fontsize(40) 
+        for tick in ax.yaxis.get_major_ticks():
+            tick.label.set_fontsize(40) 
+        # freq_plot = pd.Series(freq[len(freq)-1])
+        # ax = freq_plot.plot.hist(bins=[x/100 for x in range(0,101)], ylim=(0,50), xlim=(-0.1,1.1), title=("Clone ID: %s, Population: %i" % ('None', popSize)))
+        fig = ax.get_figure()
+        try:
+            os.makedirs(path_out, exist_ok=True) 
+        except OSError as error:
+            print(error)
+        finally:
+            if os.path.exists(path_out + "clone_mutations_VAF_%i.jpg"%x):
+                os.remove(path_out + "clone_mutations_VAF_%i.jpg"%x)
+            fig.savefig(path_out + "clone_mutations_VAF_%i.jpg"%x)
+            plt.close(fig)
+    
+
     b = 0
     for row in df.iterrows():
         if row[1]['Cells number'] > 1:#0.05*popSize: 
@@ -230,7 +289,15 @@ def binnedHist(path_in, path_out):
                 freq[i] = freq[i]/row[1]['Cells number']
             
             freq = pd.Series(freq)
-            ax = freq.plot.hist(bins=101, ylim=(0,50), xlim=(-0.1,1.1), title=("Clone ID: %i, Population: %i" % (int(row[1]['Clone number']), int(row[1]['Cells number']))))
+            ax = freq.plot.hist(bins=100, ylim=(0,50), xlim=(0,1), figsize=(40,20))
+            ax.set_xlabel("VAF", labelpad=50, fontdict={'fontsize':50})
+            ax.set_ylabel("Frequency", labelpad=50, fontdict={'fontsize':50})
+            ax.set_title("Clone ID: %i, Population: %i" % (int(row[1]['Clone number']), int(row[1]['Cells number'])), pad=50, fontdict={'fontsize':70})
+            for tick in ax.xaxis.get_major_ticks():
+                tick.label.set_fontsize(40) 
+            for tick in ax.yaxis.get_major_ticks():
+                tick.label.set_fontsize(40) 
+            
             fig = ax.get_figure()
             try:
                 os.makedirs(path_out, exist_ok=True) 
@@ -260,8 +327,6 @@ def singleHist(path_in, path_out):
     filepath = Path(path_in)  
     filepath.parent.mkdir(parents=True, exist_ok=True)
     
-    os.chdir('D:\\Mega\\Doktorat\\Matlab\\Gillespie\\Python')
-    print(os.getcwd())
     df = pd.read_csv(filepath)
     
     b = 0
@@ -272,7 +337,11 @@ def singleHist(path_in, path_out):
         w = w.split(', ')
         retVal = []
         for i in w:
-            retVal.append(int(i.strip('[]')))
+            try:
+                _t = int(i.strip('[]'))
+                retVal.append(_t)
+            except ValueError:
+                retVal = []
         df['Mutations_ID'].loc[b] = retVal.copy()
         b = b+1
         if perc != round(b/_max * 100, 1):
@@ -331,7 +400,7 @@ def singleHist(path_in, path_out):
         
     VAF = VAFdecode_ar(whole_pop, len(df))
     VAF = pd.DataFrame(VAF)
-    ax = VAF.plot.hist(bins = 101, title="Population VAF, cells = %i" % (len(df)))
+    ax = VAF.plot.hist(bins=[x/100 for x in range(0,101)], ylim=(0,50), xlim=(-0.1,1.1), title="Population VAF, cells = %i" % (len(df)))
     ax.set_xlabel("VAF")
     ax.set_ylabel("Mutations")
     
@@ -349,7 +418,7 @@ def singleHist(path_in, path_out):
     for i in range(len(clones)):
         VAF = VAFdecode_ar(mutations[i], freq[i])
         VAF = pd.DataFrame(VAF)
-        ax = VAF.plot.hist(bins = 101, title="Clone VAF, clone id = %i, clones = %i" % (clones[i], freq[i]))
+        ax = VAF.plot.hist(bins=[x/100 for x in range(0,101)], ylim=(0,50), xlim=(-0.1,1.1), title="Clone VAF, clone id = %i, clones = %i" % (clones[i], freq[i]))
         ax.set_xlabel("VAF")
         ax.set_ylabel("Mutations")
         
