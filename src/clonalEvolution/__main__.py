@@ -5,11 +5,40 @@ import numpy as np
 import pandas as pd
 from clonalEvolution.mainView import run
 import clonalEvolution.clonal_evolution_init as CEML
+import clonalEvolution.external_plots as external_plots
 
 disclaimer = '''Cellular/Microbial Clonal Evolution simulations basing on Gillespie algorithm. Copyright (C) 2022 by Jarosław Gil. 
     This program comes with ABSOLUTELY NO WARRANTY.
     This is free software, and you are welcome to redistribute it
     under certain conditions.'''
+
+def loadPaths(fname):        
+    # self.showDialog("Select file same as resume simulation", "Info")
+    xname = fname.split('\\')
+    
+    ##TODO interpret only last number!!!
+    
+    path = ""
+    name = ""
+    _last_cycle = 0
+    for i in xname:
+        if xname.index(i) == len(xname)-1:
+            t = i.split('_')
+            t = t[len(t)-1]
+            _last_cycle = int(''.join(x for x in t if x.isdigit()))
+            if i.endswith('.csv'):
+                name = i.rstrip('_' + str(_last_cycle) + '.csv')
+            elif i.endswith('.txt'):
+                name = i.rstrip('_' + str(_last_cycle) + '.txt')
+        else:
+            path = path + i + '\\'
+    
+    if name.endswith("_binned"):
+        name = name.rstrip("_binned")
+    else:
+        name = name.rstrip("_single")
+ 
+    return [name, path, _last_cycle]
 
 def saveParams(dfp, output):           
     filepath = Path(output + '\\params'  + ".csv")  
@@ -39,12 +68,16 @@ def _help():
     print("-----------------------------------------------------")
     print("-out \t \t | save files localization (obligatory)")
     print("-fname \t \t | output file name (obligatory)")
-    print("-in \t \t | load simulation parameters - path and file name")
-    print("-save \t \t | ack to save simulation data (default: True)")
+    print("-par \t \t | load simulation parameters - path and file name")
+    print("-save \t \t | ack to save simulation data (default: False)")
     print("-save_p \t | save params to file")
     print("-crit \t \t | print critical population value")
     print("-binned \t | type for binned version")
     print("-----------------------------------------------------")
+    print()
+    print("To resume simulation provide:")
+    print("-resume (-binned {optional}) -par parameters_file -file file_to_resume (-save {optional})")
+    print("In path use \\ symbol not / !")
     print()
     print(disclaimer)
 
@@ -142,12 +175,87 @@ def main():
         p = np.array(sys.argv)
         if len(p[p=='-h']) > 0:
             _help()
+        elif len(p[p=='-resume']) > 0:
+            _in = ""
+            _file = ""
+            try:
+                _in = int(np.where(p == '-par')[0][0])
+                _in = _in + 1
+                _in = p[_in]
+                _file = int(np.where(p == '-file')[0][0])
+                _file = _file + 1
+                _file = p[_file]
+            except:
+                print('Enter parameters path and file correctly')
+                return
+            dfp = loadParams(_in)
+            
+            plots = 0
+            if len(p[p=='-save'])>0:
+                plots = 16
+            
+            [name, output, cycle] = loadPaths(_file)
+            
+            print(name)
+            print(output)
+            print(cycle)
+            
+            if len(p[p=='-binned'])>0:
+                df = external_plots.loadFile(_file)
+                iClone = df['Clone number'].tolist()
+                iCells = df['Cells number'].tolist()
+                iFit = df['Mean fitness'].tolist()
+                iMut = df['Mean mutation number'].tolist()
+                iDriv = df['Driver mutation list'].tolist()
+                iPass = df['Passener mutation list'].tolist()
+                iParent = df['Previous clone number'].tolist()
+                
+                del df                  
+                
+                CEML.clonalEvolutionMainLoop(np.array([copy.deepcopy(iClone),
+                                                  copy.deepcopy(iCells),
+                                                  copy.deepcopy(iFit),
+                                                  copy.deepcopy(iMut),
+                                                  copy.deepcopy(iDriv),
+                                                  copy.deepcopy(iPass),
+                                                  copy.deepcopy(iParent)]).T.tolist(), 
+                                        copy.deepcopy([dfp['pop'][0], dfp['cap'][0], dfp['steps'][0], dfp['tau'][0], dfp['skip'][0], dfp['mut_prob'][0], dfp['mut_effect'][0], dfp['threads'][0]]), 
+                                        name, "", output, plots, t_iter=cycle+1, select=1)
+            else:
+                df = pd.read_csv(_file)
+                iMuts = df['Mutations'].tolist()
+                iClones = df['Clone'].tolist()
+                iProp = df['Fitness'].tolist()
+                iMutations = df['Mutations_ID'].tolist()
+                iEffect = df['Mutations_effect'].tolist()
+                iParent = df['Parent clone'].tolist()
+                
+                del df
+                
+                iMutations = [x.split(',') for x in iMutations]
+                for x in range(len(iMutations)):
+                    for i in range(len(iMutations[x])):
+                        iMutations[x][i] = float(iMutations[x][i].strip('[]'))
+                    
+                iEffect = [x.split(',') for x in iEffect]
+                for x in range(len(iEffect)):
+                    for i in range(len(iEffect[x])):
+                        iEffect[x][i] = float(iEffect[x][i].strip('[]'))
+                        
+                CEML.clonalEvolutionMainLoop(np.array([copy.deepcopy(iMuts),
+                                                       copy.deepcopy(iProp), 
+                                                       copy.deepcopy(iClones), 
+                                                       copy.deepcopy(iMutations), 
+                                                       copy.deepcopy(iEffect),
+                                                       copy.deepcopy(iClones)]).T.tolist(), 
+                                             copy.deepcopy([dfp['pop'][0], dfp['cap'][0], dfp['steps'][0], dfp['tau'][0], dfp['skip'][0], dfp['mut_prob'][0], dfp['mut_effect'][0], dfp['threads'][0]]), 
+                                             name, "", output, plots, t_iter=cycle+1, select=0)       
         else:
             dfp = []
-            if p[p=='-in']:
+            if p[p=='-par']:
                 _in = ""
                 try:
-                    _in = int(np.where(p == '-in')[0][0])
+                    _in = int(np.where(p == '-par')[0][0])
                     _in = _in + 1
                     _in = p[_in]
                 except:
@@ -159,7 +267,7 @@ def main():
                 
             output = ""
             name = ""
-            plots = 16
+            plots = 0
             try:
                 output = int(np.where(p == '-out')[0][0])
                 output = output + 1
@@ -179,11 +287,7 @@ def main():
                 b = dfp['mut_effect'][0]
                 print(round((a[1]/a[0])*(b[1]/b[0]**2),0))
             if len(p[p=="-save"]) > 0:
-                if p[np.where(p=="-save")+1]:
-                    plots = 16
-                else:
-                    plots = 0
-    
+                    plots = 16    
             
             if len(p[p=="-binned"]) > 0:
                 iPop = [[0, dfp['pop'][0], 1, 0, [], [], 0]]

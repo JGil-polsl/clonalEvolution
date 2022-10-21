@@ -25,6 +25,7 @@ from pathlib import Path
 from threading import Thread
 
 import clonalEvolution.clonal_evolution_binned_loop as CEBL
+# import clonal_evolution_clone_matrix_loop as CECML
 import clonalEvolution.clonal_evolution_loop as CEL
 import clonalEvolution.wmean as wm
 
@@ -385,9 +386,10 @@ def clonalEvolutionMainLoop(iPop, params, file_name="", file_description="", fil
                 FILE.close()
         
         ## Commands from GUI
-        if not q.empty():
-            queue_data = q.get()
-            command(queue_data, q, select, iPop, ID, iter_outer, iter_inner, tau, skip, cycle, file_localization, file_name)
+        if q != None:
+            if not q.empty():
+                queue_data = q.get()
+                command(queue_data, q, select, iPop, ID, iter_outer, iter_inner, tau, skip, cycle, file_localization, file_name)
 
         if end:
             break
@@ -411,6 +413,8 @@ def clonalEvolutionMainLoop(iPop, params, file_name="", file_description="", fil
             iPop = CEL.clonalEvolutionLoop(iPop, cap, tau, mut_prob, mut_effect, resume, q, threads)
         elif select == 1:
             iPop = CEBL.clonalEvolutionBinnedLoop(iPop, cap, tau, mut_prob, mut_effect, resume, q, threads, print_time)
-           
+        # elif select == 2:
+        #     iPop = CECML.clonalEvolutionCloneMatrixLoop()
+            
         resume = 0
         iter_inner = iter_inner + 1

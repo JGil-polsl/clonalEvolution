@@ -41,12 +41,13 @@ def division(i, divide, m_list): # copy mutation in passanger mutation list
             prob = np.bincount(i[5])
             prob = prob[prob!=0]/len(i[5])
             for x in range(divide):
-                mut = np.random.poisson(i[3])#math.floor(i[3]) + np.random.binomial(1,i[3]-math.floor(i[3]),1)[0] ## calculate number of mutations duplicate
+                mut = sum(np.random.poisson(i[3], divide))#math.floor(i[3]) + np.random.binomial(1,i[3]-math.floor(i[3]),1)[0] ## calculate number of mutations duplicate
                 new_muts = []
                 if mut >= len(uni): ## check if duplicate is greater than mutation list length
                     mut = len(uni)
                 try:
                     new_muts = np.random.choice(uni, size=mut, replace=False, p=prob) ## select random mutations to duplicate
+                    # new_muts = np.random.choice(i[5], size=mut)
                 except IndexError as error:
                     continue
                 except ValueError:
@@ -76,12 +77,10 @@ def dying(i, death, m_list): # delete dying mutations from passanger mutation li
                     mut = len(uni)
                 try:
                     passenger_death = np.random.choice(uni, size=mut, replace=False, p=prob) ## select random mutation from mutation list
+                    # passenger_death = np.random.choice(i[5], size=mut)
                     for x in passenger_death:
                         i[5].remove(x) ## remove mutation
                         freq[uni == x] = freq[uni == x] - 1
-                        # if freq[uni == x] == 0:
-                        #     uni = uni[uni != x]
-                        #     freq = freq[freq != 0]
                 except IndexError as error:
                     continue
                 except ValueError:
@@ -208,10 +207,13 @@ def main_loop(iPop, index, mdt, popSize, tau, mut_prob, mut_effect, print_time):
         ty[3] = ty[3] + 1
         time_t = time.time()     
         
-        if print_time:
-            print("Clone ID: %i, Dying: %.2f, newClone: %.2f, Division: %.2f, newMutation: %.2f" % (CLONE_ID,tx[0]/ty[0],tx[1]/ty[1],tx[2]/ty[2],tx[3]/ty[3]))
-            tx = [0,0,0,0]
-            ty = [0,0,0,0]
+        try:
+            if print_time:
+                print("Clone ID: %i, Dying: %.2f, newClone: %.2f, Division: %.2f, newMutation: %.2f" % (CLONE_ID,tx[0]/ty[0],tx[1]/ty[1],tx[2]/ty[2],tx[3]/ty[3]))
+                tx = [0,0,0,0]
+                ty = [0,0,0,0]
+        except ZeroDivisionError:
+            continue
 
 def clonalEvolutionBinnedLoop(iPop, cap, tau, mut_prob, mut_effect, resume, q, THREADS, print_time):
     """
@@ -233,7 +235,7 @@ def clonalEvolutionBinnedLoop(iPop, cap, tau, mut_prob, mut_effect, resume, q, T
             tau: tau step
             mut_prob: list in form of: [driver mutation probability, passenger mutation probability]
             mut_effect: list in form of: [driver mutation effect, passenger muatation effect]
-            resume: acknowledge to resume simulation !!TODO!!
+            resume: acknowledge to resume simulation
             q: common queue
             THREADS: threads number used in simulation         
     """

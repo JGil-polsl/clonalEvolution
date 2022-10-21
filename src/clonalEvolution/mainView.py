@@ -25,21 +25,23 @@ import numpy as np
 import re
 
 disclaimer = '''Cellular/Microbial Clonal Evolution simulations basing on Gillespie algorithm. Copyright (C) 2022 by Jarosław Gil. 
-    This program comes with ABSOLUTELY NO WARRANTY; for details type `show w'.
+    This program comes with ABSOLUTELY NO WARRANTY;.
     This is free software, and you are welcome to redistribute it
-    under certain conditions; type `show c' for details.'''
+    under certain conditions;'''
 
 
 from pathlib import Path 
 import time
 import matplotlib.pyplot as plt
-import clonalEvolution.clonal_evolution_init as CEML 
 from threading import Thread
+from multiprocessing import Process
 from queue import Queue
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 import copy
+
 import clonalEvolution.external_plots as external_plots
+from clonalEvolution.clonal_evolution_init import clonalEvolutionMainLoop 
 
 class mainFormat(qtWidget.QWidget):
     def __init__(self, parent=None):
@@ -119,15 +121,15 @@ class mainFormat(qtWidget.QWidget):
                 else:
                     q.put(data)
             if self._th_muller:
-                if self._th_muller[0].is_alive():
+                if self._th_muller.is_alive():
+                    self._th_muller.join()                    
                     self.status.setText("muller plot done")
-                    self._th_muller[0].join()
-                    self._th_muller = []
+                    self._th_muller = None
             if self._th_hist:
-                if self._th_hist[0].is_alive():
+                if self._th_hist.is_alive():
+                    self._th_hist.join()                    
                     self.status.setText("histograms done")
-                    self._th_hist[0].join()
-                    self._th_hist = []
+                    self._th_hist = None
     
     def closeEvent(self, event):
         
@@ -262,9 +264,9 @@ class mainFormat(qtWidget.QWidget):
         if fname == "":
             self.showDialog("No file selected!", "Alert")
             return
-        self._th_muller.append(Thread(target=external_plots.mullerPlot, args=(fname, self._file_path.text() + "\\Figures")))
+        self._th_muller = (Thread(target=external_plots.mullerPlot, args=(fname, self._file_path.text() + "\\Figures")))
         # external_plots.mullerPlot(fname, self._file_path.text() + "\\Figures")
-        self._th_muller[0].start()
+        self._th_muller.start()
         self.status.setText("muller plot ongoing")
         
     def cloneHistAction(self):
@@ -285,14 +287,14 @@ class mainFormat(qtWidget.QWidget):
             return
         name_id = re.findall('\d+', fname)[-1]
         if fname.endswith('.txt'):
-            self._th_hist.append(Thread(target=external_plots.binnedHist, args=(fname, self._file_path.text() + "\\Figures\\" + str(name_id))))
+            self._th_hist = (Thread(target=external_plots.binnedHist, args=(fname, self._file_path.text() + "\\Figures\\" + str(name_id))))
             # external_plots.binnedHist(fname, self._file_path.text() + "\\Figures\\" + str(name_id))
-            self._th_hist[0].start()
+            self._th_hist.start()
             self.status.setText("mutations histograms ongoing")
         elif fname.endswith('.csv'):
-            self._th_hist.append(Thread(target=external_plots.singleHist, args=(fname, self._file_path.text() + "\\Figures\\" + str(name_id))))
+            self._th_hist = (Thread(target=external_plots.singleHist, args=(fname, self._file_path.text() + "\\Figures\\" + str(name_id))))
             # external_plots.singleHist(fname, self._file_path.text() + "\\Figures\\" + str(name_id))
-            self._th_hist[0].start()
+            self._th_hist.start()
             self.status.setText("mutations histograms ongoing")
         else:
             self.showDialog("Wrong file", "Alert")
@@ -572,7 +574,7 @@ class mainFormat(qtWidget.QWidget):
             self.status.setStyleSheet("background-color: green")
             time.sleep(1)
 
-            self.th_s.append(Thread(target=CEML.clonalEvolutionMainLoop, args=(iPop, 
+            self.th_s.append(Thread(target=clonalEvolutionMainLoop, args=(iPop, 
                   copy.deepcopy([pop, cap, steps, tau, skip, mut_prob, mut_effect, threads]), 
                   self._file_name.text(), 
                   self._file_desc.text(), 
@@ -590,7 +592,7 @@ class mainFormat(qtWidget.QWidget):
             self.status.setStyleSheet("background-color: green")
             time.sleep(1)
     
-            self.th_s.append(Thread(target=CEML.clonalEvolutionMainLoop, args=(np.array([copy.deepcopy(iMuts),
+            self.th_s.append(Thread(target=clonalEvolutionMainLoop, args=(np.array([copy.deepcopy(iMuts),
                                                         copy.deepcopy(iProp), 
                                                         copy.deepcopy(iClones), 
                                                         copy.deepcopy(iMutations), 
@@ -650,7 +652,7 @@ class mainFormat(qtWidget.QWidget):
             self.status.setText("Started")
             self.status.setStyleSheet("background-color: green")
             time.sleep(1)            
-            self.th_r.append(Thread(target=CEML.clonalEvolutionMainLoop, args=(np.array([copy.deepcopy(iClone),
+            self.th_r.append(Thread(target=clonalEvolutionMainLoop, args=(np.array([copy.deepcopy(iClone),
                                                                   copy.deepcopy(iCells),
                                                                   copy.deepcopy(iFit),
                                                                   copy.deepcopy(iMut),
@@ -686,7 +688,7 @@ class mainFormat(qtWidget.QWidget):
             self.status.setText("Started")
             self.status.setStyleSheet("background-color: green")
             time.sleep(1)
-            self.th_r.append(Thread(target=CEML.clonalEvolutionMainLoop, args=(np.array([copy.deepcopy(iMuts),
+            self.th_r.append(Thread(target=clonalEvolutionMainLoop, args=(np.array([copy.deepcopy(iMuts),
                                                         copy.deepcopy(iProp), 
                                                         copy.deepcopy(iClones), 
                                                         copy.deepcopy(iMutations), 
@@ -805,5 +807,9 @@ def run():
     win = mainFormat()
     win.show()
     ret = app.exec_()
-    sys.exit(ret) 
+    sys.exit(ret)
+    
+if __name__ == "__main__":
+    run()
+    
 
