@@ -3,9 +3,11 @@ import copy
 from pathlib import Path
 import numpy as np
 import pandas as pd
-from clonalEvolution.mainView import run
+import scipy as sc
+
 import clonalEvolution.clonal_evolution_init as CEML
 import clonalEvolution.external_plots as external_plots
+from clonalEvolution.mainView import run
 
 disclaimer = '''Cellular/Microbial Clonal Evolution simulations basing on Gillespie algorithm. Copyright (C) 2022 by Jarosław Gil. 
     This program comes with ABSOLUTELY NO WARRANTY.
@@ -14,7 +16,7 @@ disclaimer = '''Cellular/Microbial Clonal Evolution simulations basing on Gilles
 
 def loadPaths(fname):        
     # self.showDialog("Select file same as resume simulation", "Info")
-    xname = fname.split('\\')
+    xname = fname.split('/')
     
     ##TODO interpret only last number!!!
     
@@ -31,7 +33,7 @@ def loadPaths(fname):
             elif i.endswith('.txt'):
                 name = i.rstrip('_' + str(_last_cycle) + '.txt')
         else:
-            path = path + i + '\\'
+            path = path + i + '/'
     
     if name.endswith("_binned"):
         name = name.rstrip("_binned")
@@ -41,7 +43,7 @@ def loadPaths(fname):
     return [name, path, _last_cycle]
 
 def saveParams(dfp, output):           
-    filepath = Path(output + '\\params'  + ".csv")  
+    filepath = Path(output + '/params'  + ".csv")  
     filepath.parent.mkdir(parents=True, exist_ok=True)  
     dfp.to_csv(filepath)  
 
@@ -72,12 +74,13 @@ def _help():
     print("-save \t \t | ack to save simulation data (default: False)")
     print("-save_p \t | save params to file")
     print("-crit \t \t | print critical population value")
-    print("-binned \t | type for binned version")
+    print("-binned \t | type for binned version (medium priority)")
+    print("-matrix \t | type for matrix version (big priority)")
     print("-----------------------------------------------------")
     print()
     print("To resume simulation provide:")
     print("-resume (-binned {optional}) -par parameters_file -file file_to_resume (-save {optional})")
-    print("In path use \\ symbol not / !")
+    print("In path use / symbol not \\ !")
     print()
     print(disclaimer)
 
@@ -200,7 +203,23 @@ def main():
             print(output)
             print(cycle)
             
-            if len(p[p=='-binned'])>0:
+            if len(p[p=='-matrix'])>0:
+                df = pd.read_csv(_file)
+                df = df.drop('Unnamed: 0', axis=1)
+                mm = []
+                for row in df.iterrows():
+                    mm.append(sc.sparse.load_npz(row[1]['Mutation matrix']))
+                df['Mutation matrix'] = mm
+                for i in range(len(df)):
+                    df['Driver mutation list'][i] = [int(x.strip('[]')) for x in df['Driver mutation list'][i].split(',')]
+                    df['Uniqal passenger mutation list'][i] = [int(x.strip('[]')) for x in df['Uniqal passenger mutation list'][i].split(',')]
+                
+                iPop = df.to_numpy().tolist()
+                
+                CEML.clonalEvolutionMainLoop(iPop, 
+                                        copy.deepcopy([dfp['pop'][0], dfp['cap'][0], dfp['steps'][0], dfp['tau'][0], dfp['skip'][0], dfp['mut_prob'][0], dfp['mut_effect'][0], dfp['threads'][0]]), 
+                                        name, "", output, plots, t_iter=cycle+1, select=2)
+            elif len(p[p=='-binned'])>0:
                 df = external_plots.loadFile(_file)
                 iClone = df['Clone number'].tolist()
                 iCells = df['Cells number'].tolist()
@@ -287,9 +306,14 @@ def main():
                 b = dfp['mut_effect'][0]
                 print(round((a[1]/a[0])*(b[1]/b[0]**2),0))
             if len(p[p=="-save"]) > 0:
-                    plots = 16    
-            
-            if len(p[p=="-binned"]) > 0:
+                    plots = 16   
+                    
+            if len(p[p=='-matrix'])>0:
+                iPop = [[0, dfp['pop'][0], [], [0], sc.sparse.csr_matrix(np.array([[0] for x in range(dfp['pop'][0])])), 1, 0]]
+                CEML.clonalEvolutionMainLoop(iPop,
+                                             copy.deepcopy([dfp['pop'][0], dfp['cap'][0], dfp['steps'][0], dfp['tau'][0], dfp['skip'][0], dfp['mut_prob'][0], dfp['mut_effect'][0], dfp['threads'][0]]), 
+                                             name, "", output, plots, select=2)
+            elif len(p[p=="-binned"]) > 0:
                 iPop = [[0, dfp['pop'][0], 1, 0, [], [], 0]]
                 CEML.clonalEvolutionMainLoop(iPop, 
                       copy.deepcopy([dfp['pop'][0], dfp['cap'][0], dfp['steps'][0], dfp['tau'][0], dfp['skip'][0], dfp['mut_prob'][0], dfp['mut_effect'][0], dfp['threads'][0]]), 

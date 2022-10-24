@@ -23,6 +23,7 @@ import sys
 import pandas as pd
 import numpy as np
 import re
+import scipy as sc
 
 disclaimer = '''Cellular/Microbial Clonal Evolution simulations basing on Gillespie algorithm. Copyright (C) 2022 by Jarosław Gil. 
     This program comes with ABSOLUTELY NO WARRANTY;.
@@ -169,6 +170,7 @@ class mainFormat(qtWidget.QWidget):
         if msg == "exit":
             try:
                 temp = list(map(lambda x: (x.split(',')[0]), self.s_ID))
+                print(temp)
                 index = temp.index(str(ID))
                 self.s_ID.remove(self.s_ID[index])
                 self.th_s[index].join()
@@ -176,6 +178,7 @@ class mainFormat(qtWidget.QWidget):
                 # self.idx_s = self.idx_s - 1
             except:
                 temp = list(map(lambda x: (x.split(',')[0]), self.r_ID))
+                print(temp)
                 index = temp.index(str(ID))
                 self.r_ID.remove(self.r_ID[index])
                 self.th_r[index].join()
@@ -213,8 +216,13 @@ class mainFormat(qtWidget.QWidget):
         layout.addWidget(self.tabs)
         layout.addStretch()
         
-        self._binned = qtWidget.QCheckBox("Checked: binned version")
+        self._single = qtWidget.QRadioButton("Checked: single cell version")
+        self._single.setChecked(True)
+        self._binned = qtWidget.QRadioButton("Checked: binned version")
+        self._matrix = qtWidget.QRadioButton("Checked: matrix version")
+        layout.addWidget(self._single)
         layout.addWidget(self._binned)
+        layout.addWidget(self._matrix)
         
         start = qtWidget.QPushButton(self)
         start.setText("Start simulation")
@@ -260,12 +268,12 @@ class mainFormat(qtWidget.QWidget):
         except:
             self.showDialog("Enter save path", "Alert")
             return
-        fname = qtWidget.QFileDialog.getOpenFileName(self, 'Open file', "Z://","CSV files (*.csv, *.txt)")[0]  
+        fname = qtWidget.QFileDialog.getOpenFileName(self, 'Open file', "Z://","CSV files (*.txt)")[0]  
         if fname == "":
             self.showDialog("No file selected!", "Alert")
             return
-        self._th_muller = (Thread(target=external_plots.mullerPlot, args=(fname, self._file_path.text() + "\\Figures")))
-        # external_plots.mullerPlot(fname, self._file_path.text() + "\\Figures")
+        self._th_muller = (Thread(target=external_plots.mullerPlot, args=(fname, self._file_path.text() + "/Figures")))
+        # external_plots.mullerPlot(fname, self._file_path.text() + "/Figures")
         self._th_muller.start()
         self.status.setText("muller plot ongoing")
         
@@ -281,19 +289,24 @@ class mainFormat(qtWidget.QWidget):
         except:
             self.showDialog("Enter save path", "Alert")
             return
-        fname = qtWidget.QFileDialog.getOpenFileName(None, 'Open file', "Z://","CSV files (*.csv);; Text files (*.txt)")[0] 
+        fname = qtWidget.QFileDialog.getOpenFileName(None, 'Open file', "Z://","Single data files (*.csv);; Binned data files (*.txt);; Matrix data files (*.mtx)")[0] 
         if fname == "":
             self.showDialog("No file selected!", "Alert")
             return
         name_id = re.findall('\d+', fname)[-1]
         if fname.endswith('.txt'):
-            self._th_hist = (Thread(target=external_plots.binnedHist, args=(fname, self._file_path.text() + "\\Figures\\" + str(name_id))))
-            # external_plots.binnedHist(fname, self._file_path.text() + "\\Figures\\" + str(name_id))
+            self._th_hist = (Thread(target=external_plots.binnedHist, args=(fname, self._file_path.text() + "/Figures/" + str(name_id))))
+            # external_plots.binnedHist(fname, self._file_path.text() + "/Figures/" + str(name_id))
             self._th_hist.start()
             self.status.setText("mutations histograms ongoing")
         elif fname.endswith('.csv'):
-            self._th_hist = (Thread(target=external_plots.singleHist, args=(fname, self._file_path.text() + "\\Figures\\" + str(name_id))))
-            # external_plots.singleHist(fname, self._file_path.text() + "\\Figures\\" + str(name_id))
+            self._th_hist = (Thread(target=external_plots.singleHist, args=(fname, self._file_path.text() + "/Figures/" + str(name_id))))
+            # external_plots.singleHist(fname, self._file_path.text() + "/Figures/" + str(name_id))
+            self._th_hist.start()
+            self.status.setText("mutations histograms ongoing")
+        elif fname.endswith('.mtx'):
+            self._th_hist = (Thread(target=external_plots.matrixHist, args=(fname, self._file_path.text() + "/Figures/" + str(name_id))))
+            # external_plots.singleHist(fname, self._file_path.text() + "/Figures/" + str(name_id))
             self._th_hist.start()
             self.status.setText("mutations histograms ongoing")
         else:
@@ -493,7 +506,7 @@ class mainFormat(qtWidget.QWidget):
         self.status.setText("Critical Population: " + str(round((mut_prob[1]/mut_prob[0])*(mut_effect[1]/mut_effect[0]**2),0)))
     
     def selectPath(self):
-        dir_path = qtWidget.QFileDialog.getExistingDirectory(self,"Choose Directory","Z:\\")
+        dir_path = qtWidget.QFileDialog.getExistingDirectory(self,"Choose Directory","Z:/")
         self._file_path.setText(dir_path)
 
     def saveParams(self):
@@ -532,7 +545,7 @@ class mainFormat(qtWidget.QWidget):
                 'threads': threads
             }, index=[0])
         
-        filepath = Path(self._file_path.text() + '\\params'  + ".csv")  
+        filepath = Path(self._file_path.text() + '/params'  + ".csv")  
         filepath.parent.mkdir(parents=True, exist_ok=True)  
         dfp.to_csv(filepath)  
 
@@ -581,7 +594,7 @@ class mainFormat(qtWidget.QWidget):
                   self._file_path.text(), plots, 0, self.q, self.ID, 1)))
             self.s_ID.append(str(self.ID) + ", binned")
             
-        else:        
+        elif self._single.isChecked():        
             iMuts = np.zeros(pop, dtype=np.int64).tolist()
             iProp = np.ones(pop).tolist()
             iClones = np.zeros(pop, dtype=np.int64).tolist()
@@ -603,6 +616,18 @@ class mainFormat(qtWidget.QWidget):
                                                         self._file_desc.text(), 
                                                         self._file_path.text(), plots, 0, self.q, self.ID, 0)))               
             self.s_ID.append(str(self.ID) + ", single")
+        elif self._matrix.isChecked():
+            iPop = [[0, pop, [], [0], sc.sparse.csr_matrix(np.array([[0] for x in range(pop)])), 1, 0]]
+            
+            self.status.setText("Started")
+            self.status.setStyleSheet("background-color: green")
+            time.sleep(1)
+            
+            self.th_s.append(Thread(target=clonalEvolutionMainLoop, args=(iPop, copy.deepcopy([pop, cap, steps, tau, skip, mut_prob, mut_effect, threads]),
+                                    self._file_name.text(), 
+                                    self._file_desc.text(), 
+                                    self._file_path.text(), plots, 0, self.q, self.ID, 2)))
+            self.s_ID.append(str(self.ID) + ", matrix")
             
         self.ID = self.ID + 1
         self.th_s[self.idx_s].start()
@@ -610,7 +635,7 @@ class mainFormat(qtWidget.QWidget):
        
     def resume(self):
         self.showPromptParams()
-        fname = qtWidget.QFileDialog.getOpenFileName(self, 'Open file', "Z://","Data Files (*.csv, *.txt)")[0]       
+        fname = qtWidget.QFileDialog.getOpenFileName(self, 'Open file', "Z://","Single data files (*.csv);; Binned data files (*.txt);; Matrix data files (*.mtx)")[0]       
         if fname == "":
             self.showDialog("No file selected!", "Alert")
             return
@@ -664,7 +689,7 @@ class mainFormat(qtWidget.QWidget):
                                                         self._file_desc.text(), 
                                                         self._file_path.text(), plots, self._last_cycle + 1, self.q, self.ID, 1)))
             self.r_ID.append(str(self.ID) + ", binned")
-        else:
+        elif self._single.isChecked():
             df = pd.read_csv(fname)
             iMuts = df['Mutations'].tolist()
             iClones = df['Clone'].tolist()
@@ -699,6 +724,29 @@ class mainFormat(qtWidget.QWidget):
                                                        self._file_desc.text(), 
                                                        self._file_path.text(), plots, self._last_cycle + 1, self.q, self.ID, 0)))            
             self.r_ID.append(str(self.ID) + ", single")
+            
+        elif self._matrix.isChecked():
+            df = pd.read_csv(fname)
+            df = df.drop('Unnamed: 0', axis=1)
+            mm = []
+            for row in df.iterrows():
+                mm.append(sc.sparse.load_npz(row[1]['Mutation matrix']))
+            df['Mutation matrix'] = mm
+            for i in range(len(df)):
+                df['Driver mutation list'][i] = [int(x.strip('[]')) for x in df['Driver mutation list'][i].split(',')]
+                df['Uniqal passenger mutation list'][i] = [int(x.strip('[]')) for x in df['Uniqal passenger mutation list'][i].split(',')]
+            
+            iPop = df.to_numpy().tolist()
+            
+            self.status.setText("Started")
+            self.status.setStyleSheet("background-color: green")
+            time.sleep(1)
+            
+            self.th_r.append(Thread(target=clonalEvolutionMainLoop, args=(iPop, copy.deepcopy([pop, cap, steps, tau, skip, mut_prob, mut_effect, threads]),
+                                    self._file_name.text(), 
+                                    self._file_desc.text(), 
+                                    self._file_path.text(), plots, self._last_cycle + 1, self.q, self.ID, 2)))
+            self.r_ID.append(str(self.ID) + ", matrix")
             
         self.ID = self.ID + 1
         self.th_r[self.idx_r].start()
@@ -792,7 +840,7 @@ class mainFormat(qtWidget.QWidget):
                 elif i.endswith('.txt'):
                     name = i.rstrip('_' + str(self._last_cycle) + '.txt')
             else:
-                path = path + i + '\\'
+                path = path + i + '/'
         
         if name.endswith("_binned"):
             name = name.rstrip("_binned")

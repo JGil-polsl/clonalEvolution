@@ -21,6 +21,7 @@ import os
 from pathlib import Path
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
+import scipy as sc
 
 def mullerPlot(path_in, path_out):   
     '''
@@ -311,6 +312,172 @@ def binnedHist(path_in, path_out):
         else:
             continue
 
+def matrixHist(path_in, path_out):
+    '''
+    path_in - absolute path to file with .mtx extension (matrix simulation data is saved into mtx file)
+    path_out - absolute path to figures save localization
+    '''
+    
+    if not path_in.endswith('.mtx'):
+        print("Wrong file")
+        return
+    
+    if not path_out.endswith('/'):
+        path_out = path_out + '/'
+    
+    df = pd.read_csv(path_in)
+    
+    mm = []
+    for row in df.iterrows():
+        mm.append(sc.sparse.load_npz(row[1]['Mutation matrix']))
+        
+    df['Mutation matrix'] = mm
+    
+    for i in range(len(df)):
+        df['Driver mutation list'][i] = [int(x.strip('[]')) for x in df['Driver mutation list'][i].split(',')]
+        df['Uniqal passenger mutation list'][i] = [int(x.strip('[]')) for x in df['Uniqal passenger mutation list'][i].split(',')]
+    
+    popSize = sum(df['Cells number'])
+    
+    pIDs = []
+    for i in df['Uniqal passenger mutation list']:
+        pIDs.extend(i)
+    for i in df['Driver mutation list']:
+        pIDs.extend(i)
+    pIDs = np.unique(pIDs).tolist()
+    pFreq = np.array([np.zeros(len(pIDs)) for x in range(len(df)+1)])
+    
+    for i in range(len(pFreq)-1):
+        muts = df['Uniqal passenger mutation list'][i] 
+        driv = df['Driver mutation list'][i]
+        freqs = df['Mutation matrix'][i]
+        freqs = [freqs[:,x].count_nonzero() for x in range(freqs._shape[1])]
+        muts = np.array(muts)[0:len(freqs)].tolist()
+        for m in muts:
+            a = freqs[muts.index(m)]     
+            pFreq[i,pIDs.index(m)] = a    
+        for m in driv:
+            a = df['Cells number'][i]
+            pFreq[i,pIDs.index(m)] = a
+    
+    for i in range(len(pFreq[0,:])):
+        pFreq[len(pFreq[:,0])-1,i] = sum(pFreq[:,i])
+        
+    for i in range(len(pFreq[:,0])-1):
+        for j in range(len(pFreq[0,:])):
+            pFreq[i,j] = round(pFreq[i,j]/pFreq[len(pFreq[:,0])-1,j],2)
+        
+    pFreq[len(pFreq[:,0])-1,:] = pFreq[len(pFreq[:,0])-1,:]/popSize    
+    pFreq = pFreq.T
+    pFreq = pFreq[np.argsort(pFreq[:,len(pFreq[1,:])-1])]
+    pFreq = pFreq.tolist()
+    
+    t_freq = [x/200 for x in range(0,201)]
+    freq = np.zeros((len(pFreq[0]),len(t_freq)))
+    freq[len(freq[:,0])-1,:] = t_freq
+    idx = 1
+    for i in pFreq:
+        while i[len(i)-1] > t_freq[2*idx]:
+            idx = idx + 1
+            if idx == 101:
+                break
+        else:
+            if i[len(i)-1] == 0:
+                continue
+            for x in range(len(i)-1):
+                freq[x,2*idx - 1] = freq[x,2*idx - 1] + i[x]
+    
+    pl = pd.DataFrame(freq.T)
+    names = [str(x) for x in df['Clone number']]
+    names.append('sum')
+    pl.columns = names
+    
+    for x in range(0,2):
+        ax = pl.plot.bar(x='sum', stacked=True, width = 2, figsize=(40,20))
+        ax.legend(prop={'size':30})
+        if x == 0:
+            ax.set_ylim(0,100)
+        ax.set_xlabel("VAF", labelpad=50, fontdict={'fontsize':50})
+        ax.set_ylabel("Frequency", labelpad=50, fontdict={'fontsize':50})
+        ax.set_title("Population VAF, Population: %i" % popSize, pad=50, fontdict={'fontsize':70})
+        ax.xaxis.set_major_locator(ticker.MultipleLocator(20))
+        ax.xaxis.set_minor_locator(ticker.MultipleLocator(2))
+        for tick in ax.xaxis.get_major_ticks():
+            tick.label.set_fontsize(40) 
+        for tick in ax.yaxis.get_major_ticks():
+            tick.label.set_fontsize(40) 
+        fig = ax.get_figure()
+        try:
+            os.makedirs(path_out, exist_ok=True) 
+        except OSError as error:
+            print(error)
+        finally:
+            if os.path.exists(path_out + "clone_mutations_VAF_%i.jpg"%x):
+                os.remove(path_out + "clone_mutations_VAF_%i.jpg"%x)
+            fig.savefig(path_out + "clone_mutations_VAF_%i.jpg"%x)
+            plt.close(fig)
+    
+    for clone in df.iterrows():
+        freqs = clone[1]['Mutation matrix']        
+        _sum = [freqs[:,x].count_nonzero() for x in range(freqs._shape[1])]
+        freqs = [1 for x in range(freqs._shape[1])]
+        
+        pl = np.zeros(len(freqs)).tolist()
+        for i in clone[1]['Driver mutation list']:
+            freqs.append(0)
+            pl.append(1)
+            _sum.append(clone[1]['Cells number'])
+            
+        freq = np.zeros((3,len(pl)))
+        freq[0,:] = np.array(freqs)
+        freq[1,:] = np.array(pl)
+        freq[2,:] = np.array(_sum)/clone[1]['Cells number']  
+        
+        freq = freq.T
+        freq = freq[np.argsort(freq[:,len(freq[1,:])-1])]
+        freq = freq.tolist()
+        
+        t_freq = [x/200 for x in range(0,201)]
+        pfreq = np.zeros((len(freq[0]),len(t_freq)))
+        pfreq[len(pfreq[:,0])-1,:] = t_freq
+        idx = 1
+        for i in freq:
+            while i[len(i)-1] > t_freq[2*idx]:
+                idx = idx + 1
+                if idx == 101:
+                    break
+            else:
+                if i[len(i)-1] == 0:
+                    continue
+                for x in range(len(i)-1):
+                    pfreq[x,2*idx - 1] = pfreq[x,2*idx - 1] + i[x]
+        
+        freq = pd.DataFrame(pfreq.T)
+        freq.columns = ["passenger","driver","sum"]
+        ax = freq.plot.bar(x='sum', stacked=True, xlim=(0,1), width=2, figsize=(40,20))
+        ax.legend(prop={'size':30})
+        ax.set_xlabel("VAF", labelpad=50, fontdict={'fontsize':50})
+        ax.set_ylabel("Frequency", labelpad=50, fontdict={'fontsize':50})
+        ax.set_title("Population VAF, Clone ID: %i, Population: %i" % (clone[1]['Clone number'], clone[1]['Cells number']), pad=50, fontdict={'fontsize':70})
+        ax.xaxis.set_major_locator(ticker.MultipleLocator(20))
+        ax.xaxis.set_minor_locator(ticker.MultipleLocator(2))
+        for tick in ax.xaxis.get_major_ticks():
+            tick.label.set_fontsize(40) 
+        for tick in ax.yaxis.get_major_ticks():
+            tick.label.set_fontsize(40)
+        
+        fig = ax.get_figure()
+        try:
+            os.makedirs(path_out, exist_ok=True) 
+        except OSError as error:
+            print(error)
+        finally:
+            if os.path.exists(path_out + "clone_mutations_VAF_ID_" + str(int(clone[1]['Clone number'])) +".jpg"):
+                os.remove(path_out + "clone_mutations_VAF_ID_" + str(int(clone[1]['Clone number'])) +".jpg")
+            fig.savefig(path_out + "clone_mutations_VAF_ID_" + str(int(clone[1]['Clone number'])) +".jpg")
+            plt.close(fig)
+        
+
 def singleHist(path_in, path_out):
     '''
     path_in - absolute path to file with .csv extension (single cell simulation data is saved into csv file)
@@ -433,3 +600,7 @@ def singleHist(path_in, path_out):
             fig.savefig(path_out + "clone_mutations_VAF_ID_" + str(clones[i]) +".jpg")
             plt.close(fig)
             print("saving files %.1f %%" % (i/len(clones) * 100))
+            
+# if __name__ == "__main__":
+#     matrixHist("E:\Simulations\Clonal Evolution\Mutation matrix aproach\mm_400.mtx", 
+#                "E:\Simulations\Clonal Evolution\Mutation matrix aproach\Figures\\400")

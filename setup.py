@@ -22,7 +22,7 @@ setup(
     # specification here:
     # https://packaging.python.org/specifications/core-metadata/#name
     name="clonalEvolution", 
-    version="1.1.0",
+    version="1.1.5",
     description="Software for simulating clonal evolution in binned and tau leap version.",
     url="https://github.com/JGil-polsl/clonalEvolution",
     author="Jaroslaw Gil",  
@@ -61,7 +61,7 @@ setup(
     packages=find_packages(where="src"),
     python_requires=">=3.7",
     
-    install_requires=["numpy", "pandas", "matplotlib", "PyQt5"], 
+    install_requires=["numpy", "pandas", "matplotlib", "PyQt5", "scipy"], 
     
     # To provide executable scripts, use entry points in preference to the
     # "scripts" keyword. Entry points provide cross-platform support and allow

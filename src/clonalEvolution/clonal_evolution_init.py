@@ -18,14 +18,16 @@
 
 import matplotlib.pyplot as plt
 import numpy as np
+import scipy as sc
 import time
 import os
+import copy
 import pandas as pd
 from pathlib import Path  
 from threading import Thread
 
 import clonalEvolution.clonal_evolution_binned_loop as CEBL
-# import clonal_evolution_clone_matrix_loop as CECML
+import clonalEvolution.clonal_evolution_clone_matrix_loop as CECML
 import clonalEvolution.clonal_evolution_loop as CEL
 import clonalEvolution.wmean as wm
 
@@ -60,8 +62,17 @@ def waveMut_ar(iMuts, iClones, cln):
     
     return muts, clones, m_u, c_u, TAB
 
+def saveMatrixData(df, file_localization, file_name, iter_outer):
+    names = df['Mutation matrix']
+    for i in names:
+        sc.sparse.save_npz(i[0], i[1])
+    df['Mutation matrix'] = [x[0] for x in names]
+    filepath = Path(file_localization + '/' + file_name + '_' + str(iter_outer).replace('.','_') + ".mtx")      
+    filepath.parent.mkdir(parents=True, exist_ok=True)  
+    df.to_csv(filepath)     
+
 def saveToFile(df, file_localization, file_name, iter_outer, ending):    
-    filepath = Path(file_localization + '\\' + file_name + '_' + str(iter_outer).replace('.','_') + ending)      
+    filepath = Path(file_localization + '/' + file_name + '_' + str(iter_outer).replace('.','_') + ending)      
     filepath.parent.mkdir(parents=True, exist_ok=True)  
     df.to_csv(filepath)  
 
@@ -230,6 +241,12 @@ def command(queue_data, q, select, iPop, ID, iter_outer, iter_inner, tau, skip, 
                         'Cells number': [row[1] for row in iPop],
                     })
                 q.put(["-2", str(ID), df])
+            elif select == 2:
+                df = pd.DataFrame({
+                        'Clone': [row[0] for row in iPop],
+                        'Cells number': [row[1] for row in iPop],
+                    })
+                q.put(["-2", str(ID), df])
         elif(queue_data[2] == 'clone'):
             if select == 0:
                 _CLONES = []
@@ -294,6 +311,30 @@ def plotter(plots, iPop, file_name, file_localization, iter_outer, select):
                                                     }),  
                                                   file_localization, file_name + '_binned', iter_outer, ".txt"))
             tsf.start()  
+    
+    elif select == 2:
+        if plots & 16:
+            names = []
+            for clone in iPop:
+                s_path = file_localization + '/Data/' + str(iter_outer).replace('.','_') + '/'
+                try:
+                    os.makedirs(s_path, exist_ok=True) 
+                except OSError as error:
+                    print(error)
+                finally:
+                    s_path = s_path + file_name + '_clone_data_' + str(clone[0]) + '.npz'
+                names.append([s_path, clone[4]])
+            
+            tsf = Thread(target=saveMatrixData, args=(pd.DataFrame({
+                                                            'Clone number': [row[0] for row in iPop],
+                                                            'Cells number': [row[1] for row in iPop],
+                                                            'Driver mutation list': [row[2] for row in iPop],
+                                                            'Uniqal passenger mutation list': [row[3] for row in iPop],
+                                                            'Mutation matrix': [row for row in names],
+                                                            'Clone fitness': [row[5] for row in iPop],
+                                                            'Previous clone number': [row[6] for row in iPop]
+                                                        }), file_localization, file_name, iter_outer))
+            tsf.start()
 
 def clonalEvolutionMainLoop(iPop, params, file_name="", file_description="", file_localization="", plots=0, t_iter=0, q=None, ID=0, select=0):
     """
@@ -313,6 +354,12 @@ def clonalEvolutionMainLoop(iPop, params, file_name="", file_description="", fil
                 Mean mutation number
                 Driver mutation list
                 Passener mutation list
+                Previous clone number
+            MATRIX ALGORITHM
+                Clone number
+                Driver mutation list
+                Uniqal passener mutation list
+                Mutation matrix
                 Previous clone number
         params: simulation parameters with structure 
         [initial population size, population capacity, simulation steps number, tau step [s], one cycle time [s], 
@@ -349,23 +396,30 @@ def clonalEvolutionMainLoop(iPop, params, file_name="", file_description="", fil
     
     if select == 0 and begin and plots & 16:
         os.makedirs(file_localization, exist_ok=True) 
-        FILE = open(file_localization + '\\' + file_name + "_muller_plot_single_data.txt", 'w')
+        FILE = open(file_localization + '/' + file_name + "_muller_plot_single_data.txt", 'w')
         FILE.write("clone, cells, previous clone")
         FILE.write('\n')
         FILE.close()
     elif select == 1 and begin and plots & 16:        
         os.makedirs(file_localization, exist_ok=True) 
-        FILE = open(file_localization + '\\' + file_name + "_muller_plot_binned_data.txt", 'w')
+        FILE = open(file_localization + '/' + file_name + "_muller_plot_binned_data.txt", 'w')
         FILE.write("clone, cells, previous clone")
         FILE.write('\n')
         FILE.close()
+    elif select == 2 and begin and plots & 16:        
+        os.makedirs(file_localization, exist_ok=True) 
+        FILE = open(file_localization + '/' + file_name + "_muller_plot_matrix_data.txt", 'w')
+        FILE.write("clone, cells, previous clone")
+        FILE.write('\n')
+        FILE.close()
+
 
     while 1:
         
         ## Data for muller plot
         if iter_inner % (cycle/skip) == 0:
             if select == 0:
-                FILE = open(file_localization + '\\' + file_name + "_muller_plot_single_data.txt", 'a')
+                FILE = open(file_localization + '/' + file_name + "_muller_plot_single_data.txt", 'a')
                 _CLONES = []
                 _CELLS = []
                 _LAST = []
@@ -380,7 +434,12 @@ def clonalEvolutionMainLoop(iPop, params, file_name="", file_description="", fil
                 FILE.write('\n')
                 FILE.close()
             elif select == 1:
-                FILE = open(file_localization + '\\' + file_name + "_muller_plot_binned_data.txt", 'a')
+                FILE = open(file_localization + '/' + file_name + "_muller_plot_binned_data.txt", 'a')
+                FILE.write("".join(["(%.0f, %.0f, %.0f)" % (row[0], row[1], row[6]) for row in iPop]))
+                FILE.write('\n')
+                FILE.close()
+            elif select == 2:
+                FILE = open(file_localization + '/' + file_name + "_muller_plot_matrix_data.txt", 'a')
                 FILE.write("".join(["(%.0f, %.0f, %.0f)" % (row[0], row[1], row[6]) for row in iPop]))
                 FILE.write('\n')
                 FILE.close()
@@ -413,8 +472,8 @@ def clonalEvolutionMainLoop(iPop, params, file_name="", file_description="", fil
             iPop = CEL.clonalEvolutionLoop(iPop, cap, tau, mut_prob, mut_effect, resume, q, threads)
         elif select == 1:
             iPop = CEBL.clonalEvolutionBinnedLoop(iPop, cap, tau, mut_prob, mut_effect, resume, q, threads, print_time)
-        # elif select == 2:
-        #     iPop = CECML.clonalEvolutionCloneMatrixLoop()
+        elif select == 2:
+            iPop = CECML.clonalEvolutionCloneMatrixLoop(iPop, cap, tau, mut_prob, mut_effect, resume, q, threads, print_time)
             
         resume = 0
         iter_inner = iter_inner + 1
