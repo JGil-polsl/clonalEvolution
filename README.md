@@ -101,7 +101,7 @@ Jarosław Gil, Silesian Univeristy of Technology, Department of Computer Graphic
 
 # Changelog
 
-v1.0.0 - Working single cell algorithm, binned algorithm
-v1.1.0 - fixes
-v1.1.5 - fixes
-v1.2.0 - Added matrix algorithm, process solution (instead of thred, one simulation wokring as new process - much faster)
+v1.0.0 - Working single cell algorithm, binned algorithm \
+v1.1.0 - fixes \
+v1.1.5 - fixes \
+v1.2.0 - Added matrix algorithm, process solution (instead of thred, one simulation wokring as new process - much faster) \
