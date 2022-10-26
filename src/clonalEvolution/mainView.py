@@ -40,8 +40,8 @@ from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as Navigatio
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 import copy
 
-import external_plots as external_plots
-from clonal_evolution_init import clonalEvolutionMainLoop 
+import clonalEvolution.external_plots as external_plots
+from clonalEvolution.clonal_evolution_init import clonalEvolutionMainLoop 
 
 class mainFormat(qtWidget.QWidget):
     def __init__(self, parent=None):

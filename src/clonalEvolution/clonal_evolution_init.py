@@ -26,10 +26,10 @@ import pandas as pd
 from pathlib import Path  
 from threading import Thread
 
-import clonal_evolution_binned_loop as CEBL
-import clonal_evolution_clone_matrix_loop as CECML
-import clonal_evolution_loop as CEL
-import wmean as wm
+import clonalEvolution.clonal_evolution_binned_loop as CEBL
+import clonalEvolution.clonal_evolution_clone_matrix_loop as CECML
+import clonalEvolution.clonal_evolution_loop as CEL
+import clonalEvolution.wmean as wm
 
 end = False
     
@@ -417,7 +417,7 @@ def clonalEvolutionMainLoop(iPop, params, file_name="", file_description="", fil
     while 1:
         
         ## Data for muller plot
-        if iter_inner % (cycle/skip) == 0:
+        if iter_inner % (cycle/skip) == 0 and plots & 16:
             if select == 0:
                 FILE = open(file_localization + '/' + file_name + "_muller_plot_single_data.txt", 'a')
                 _CLONES = []
