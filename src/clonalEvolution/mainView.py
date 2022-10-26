@@ -35,14 +35,13 @@ from pathlib import Path
 import time
 import matplotlib.pyplot as plt
 from threading import Thread
-from multiprocessing import Process
-from queue import Queue
+from multiprocessing import Process, Queue
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 import copy
 
-import clonalEvolution.external_plots as external_plots
-from clonalEvolution.clonal_evolution_init import clonalEvolutionMainLoop 
+import external_plots as external_plots
+from clonal_evolution_init import clonalEvolutionMainLoop 
 
 class mainFormat(qtWidget.QWidget):
     def __init__(self, parent=None):
@@ -108,10 +107,13 @@ class mainFormat(qtWidget.QWidget):
             self.status.setText(ID + ": PLOTTED")
     
     def monitor(self, q, status):
-        while self._monitor:
+        while True:
             if not q.empty():
                 data = q.get()
-                if data[0] == '0':
+                if data[0] == 'exit':
+                    print('exit monitor')
+                    break
+                elif data[0] == '0':
                     status.setText(data[1] + ": " + data[2])
                 elif data[0] == "-1":
                     status.setText(data[1] + ": plot")
@@ -135,9 +137,9 @@ class mainFormat(qtWidget.QWidget):
     def closeEvent(self, event):
         
         for i in self.s_ID:
-            self.q.put(['1', str(i), "exit"])
+            self.q.put(['1', str(i).split(',')[0], "exit"])
         for i in self.r_ID:
-            self.q.put(['1', str(i), "exit"])
+            self.q.put(['1', str(i).split(',')[0], "exit"])
         
         for i in self.th_r:
             i.join()
@@ -150,7 +152,7 @@ class mainFormat(qtWidget.QWidget):
             self._th_hist[0].join()
             
         plt.close(self._fig)
-        self._monitor = False
+        self.q.put(['exit'])
         self.th_monitor.join()
         event.accept()  
     
@@ -170,20 +172,18 @@ class mainFormat(qtWidget.QWidget):
         if msg == "exit":
             try:
                 temp = list(map(lambda x: (x.split(',')[0]), self.s_ID))
-                print(temp)
                 index = temp.index(str(ID))
                 self.s_ID.remove(self.s_ID[index])
                 self.th_s[index].join()
                 self.th_s.remove(self.th_s[index])
-                # self.idx_s = self.idx_s - 1
+                self.idx_s = self.idx_s - 1
             except:
                 temp = list(map(lambda x: (x.split(',')[0]), self.r_ID))
-                print(temp)
                 index = temp.index(str(ID))
                 self.r_ID.remove(self.r_ID[index])
                 self.th_r[index].join()
                 self.th_r.remove(self.th_r[index])
-                # self.idx_r = self.idx_r - 1
+                self.idx_r = self.idx_r - 1
             
             self.status.setText("Stopped")
             if not self.th_r and not self.th_s:
@@ -587,7 +587,7 @@ class mainFormat(qtWidget.QWidget):
             self.status.setStyleSheet("background-color: green")
             time.sleep(1)
 
-            self.th_s.append(Thread(target=clonalEvolutionMainLoop, args=(iPop, 
+            self.th_s.append(Process(target=clonalEvolutionMainLoop, args=(iPop, 
                   copy.deepcopy([pop, cap, steps, tau, skip, mut_prob, mut_effect, threads]), 
                   self._file_name.text(), 
                   self._file_desc.text(), 
@@ -605,7 +605,7 @@ class mainFormat(qtWidget.QWidget):
             self.status.setStyleSheet("background-color: green")
             time.sleep(1)
     
-            self.th_s.append(Thread(target=clonalEvolutionMainLoop, args=(np.array([copy.deepcopy(iMuts),
+            self.th_s.append(Process(target=clonalEvolutionMainLoop, args=(np.array([copy.deepcopy(iMuts),
                                                         copy.deepcopy(iProp), 
                                                         copy.deepcopy(iClones), 
                                                         copy.deepcopy(iMutations), 
@@ -623,10 +623,13 @@ class mainFormat(qtWidget.QWidget):
             self.status.setStyleSheet("background-color: green")
             time.sleep(1)
             
-            self.th_s.append(Thread(target=clonalEvolutionMainLoop, args=(iPop, copy.deepcopy([pop, cap, steps, tau, skip, mut_prob, mut_effect, threads]),
-                                    self._file_name.text(), 
-                                    self._file_desc.text(), 
-                                    self._file_path.text(), plots, 0, self.q, self.ID, 2)))
+            self.th_s.append(Process(target=clonalEvolutionMainLoop, args=(
+                iPop, 
+                copy.deepcopy([pop, cap, steps, tau, skip, mut_prob, mut_effect, threads]),
+                self._file_name.text(), 
+                self._file_desc.text(), 
+                self._file_path.text(), plots, 0, self.q, self.ID, 2)))
+            
             self.s_ID.append(str(self.ID) + ", matrix")
             
         self.ID = self.ID + 1
@@ -677,7 +680,7 @@ class mainFormat(qtWidget.QWidget):
             self.status.setText("Started")
             self.status.setStyleSheet("background-color: green")
             time.sleep(1)            
-            self.th_r.append(Thread(target=clonalEvolutionMainLoop, args=(np.array([copy.deepcopy(iClone),
+            self.th_r.append(Process(target=clonalEvolutionMainLoop, args=(np.array([copy.deepcopy(iClone),
                                                                   copy.deepcopy(iCells),
                                                                   copy.deepcopy(iFit),
                                                                   copy.deepcopy(iMut),
@@ -713,7 +716,7 @@ class mainFormat(qtWidget.QWidget):
             self.status.setText("Started")
             self.status.setStyleSheet("background-color: green")
             time.sleep(1)
-            self.th_r.append(Thread(target=clonalEvolutionMainLoop, args=(np.array([copy.deepcopy(iMuts),
+            self.th_r.append(Process(target=clonalEvolutionMainLoop, args=(np.array([copy.deepcopy(iMuts),
                                                         copy.deepcopy(iProp), 
                                                         copy.deepcopy(iClones), 
                                                         copy.deepcopy(iMutations), 
@@ -742,7 +745,7 @@ class mainFormat(qtWidget.QWidget):
             self.status.setStyleSheet("background-color: green")
             time.sleep(1)
             
-            self.th_r.append(Thread(target=clonalEvolutionMainLoop, args=(iPop, copy.deepcopy([pop, cap, steps, tau, skip, mut_prob, mut_effect, threads]),
+            self.th_r.append(Process(target=clonalEvolutionMainLoop, args=(iPop, copy.deepcopy([pop, cap, steps, tau, skip, mut_prob, mut_effect, threads]),
                                     self._file_name.text(), 
                                     self._file_desc.text(), 
                                     self._file_path.text(), plots, self._last_cycle + 1, self.q, self.ID, 2)))
@@ -859,5 +862,3 @@ def run():
     
 if __name__ == "__main__":
     run()
-    
-

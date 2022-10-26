@@ -26,10 +26,10 @@ import pandas as pd
 from pathlib import Path  
 from threading import Thread
 
-import clonalEvolution.clonal_evolution_binned_loop as CEBL
-import clonalEvolution.clonal_evolution_clone_matrix_loop as CECML
-import clonalEvolution.clonal_evolution_loop as CEL
-import clonalEvolution.wmean as wm
+import clonal_evolution_binned_loop as CEBL
+import clonal_evolution_clone_matrix_loop as CECML
+import clonal_evolution_loop as CEL
+import wmean as wm
 
 end = False
     
