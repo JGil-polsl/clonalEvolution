@@ -465,8 +465,9 @@ def clonalEvolutionMainLoop(iPop, params, file_name="", file_description="", fil
             t = time.time()
 
         print_time = not iter_inner % round(cycle/skip)        
-        # if iter_outer % steps == 0:
-        #     print("pointer")
+        if iter_outer % steps == 0:
+            print('simulation ended, ID: %i' % ID)
+            break
         
         if select == 0:            
             iPop = CEL.clonalEvolutionLoop(iPop, cap, tau, mut_prob, mut_effect, resume, q, threads)
@@ -477,3 +478,4 @@ def clonalEvolutionMainLoop(iPop, params, file_name="", file_description="", fil
             
         resume = 0
         iter_inner = iter_inner + 1
+    q.put(['ended', ID])

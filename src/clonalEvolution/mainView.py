@@ -56,6 +56,9 @@ class mainFormat(qtWidget.QWidget):
         self.q = Queue()
         self._th_muller = []
         self._th_hist = []
+        self._th_mw = []
+        self._th_fw = []
+        self._th_cp = []
         self.createMainView()
         self._monitor = True
         self.th_monitor = Thread(target=self.monitor, args=(self.q, self.status))
@@ -121,6 +124,22 @@ class mainFormat(qtWidget.QWidget):
                 elif data[0] == "-2":
                     status.setText(data[1] + ": plot")
                     Thread(target=self.plot, args=(data[1],data[2], 1)).start()
+                elif data[0] == 'ended':
+                    ID = data[1]
+                    try:
+                        temp = list(map(lambda x: (x.split(',')[0]), self.s_ID))
+                        index = temp.index(str(ID))
+                        self.s_ID.remove(self.s_ID[index])
+                        self.th_s[index].join()
+                        self.th_s.remove(self.th_s[index])
+                        self.idx_s = self.idx_s - 1
+                    except:
+                        temp = list(map(lambda x: (x.split(',')[0]), self.r_ID))
+                        index = temp.index(str(ID))
+                        self.r_ID.remove(self.r_ID[index])
+                        self.th_r[index].join()
+                        self.th_r.remove(self.th_r[index])
+                        self.idx_r = self.idx_r - 1
                 else:
                     q.put(data)
             if self._th_muller:
@@ -289,28 +308,108 @@ class mainFormat(qtWidget.QWidget):
         except:
             self.showDialog("Enter save path", "Alert")
             return
-        fname = qtWidget.QFileDialog.getOpenFileName(None, 'Open file', "Z://","Single data files (*.csv);; Binned data files (*.txt);; Matrix data files (*.mtx)")[0] 
+        fname = qtWidget.QFileDialog.getOpenFileNames(None, 'Open file', "Z://","Single data files (*.csv);; Binned data files (*.txt);; Matrix data files (*.mtx)")[0] 
         if fname == "":
             self.showDialog("No file selected!", "Alert")
             return
-        name_id = re.findall('\d+', fname)[-1]
-        if fname.endswith('.txt'):
-            self._th_hist = (Thread(target=external_plots.binnedHist, args=(fname, self._file_path.text() + "/Figures/" + str(name_id))))
-            # external_plots.binnedHist(fname, self._file_path.text() + "/Figures/" + str(name_id))
+        name_id = []
+        for i in fname:
+            name_id.append(re.findall('\d+', i)[-1])
+        if all(map(lambda x: x.endswith('.txt'), fname)):
+            self._th_hist = (Thread(target=external_plots.binnedHist, args=(fname, self._file_path.text(), name_id)))
+            # external_plots.binnedHist(fname, self._file_path.text(), name_id)
             self._th_hist.start()
             self.status.setText("mutations histograms ongoing")
-        elif fname.endswith('.csv'):
-            self._th_hist = (Thread(target=external_plots.singleHist, args=(fname, self._file_path.text() + "/Figures/" + str(name_id))))
-            # external_plots.singleHist(fname, self._file_path.text() + "/Figures/" + str(name_id))
+        elif all(map(lambda x: x.endswith('.csv'), fname)):
+            self._th_hist = (Thread(target=external_plots.singleHist, args=(fname, self._file_path.text(), name_id)))
+            # external_plots.singleHist(fname, self._file_path.text(), name_id)
             self._th_hist.start()
             self.status.setText("mutations histograms ongoing")
-        elif fname.endswith('.mtx'):
-            self._th_hist = (Thread(target=external_plots.matrixHist, args=(fname, self._file_path.text() + "/Figures/" + str(name_id))))
-            # external_plots.singleHist(fname, self._file_path.text() + "/Figures/" + str(name_id))
+        elif all(map(lambda x: x.endswith('.mtx'), fname)):
+            self._th_hist = (Thread(target=external_plots.matrixHist, args=(fname, self._file_path.text(), name_id)))
+            # external_plots.matrixHist(fname, self._file_path.text(), name_id)
             self._th_hist.start()
             self.status.setText("mutations histograms ongoing")
         else:
-            self.showDialog("Wrong file", "Alert")
+            self.showDialog("Wrong file/files extension. Use only one kind at time", "Alert")
+            
+    def mutWaveAction(self):
+        try:
+            if self._file_path.text() == "":
+                raise Exception()
+            if self._th_mw:
+                raise NameError()
+        except NameError:
+            self.showDialog("Plotting already", "Alert")
+            return
+        except:
+            self.showDialog("Enter save path", "Alert")
+            return
+        
+        fname = qtWidget.QFileDialog.getOpenFileNames(None, 'Open file', "Z://","Single data files (*.csv);; Binned data files (*.txt);; Matrix data files (*.mtx)")[0] 
+        if fname == "":
+            self.showDialog("No file selected!", "Alert")
+            return
+        name_id = []
+        for i in fname:
+            name_id.append(re.findall('\d+', i)[-1])
+            
+        # self._th_mw = (Thread(target=external_plots.mutWavePlot, args=(fname, self._file_path.text(), name_id)))
+        external_plots.mutWavePlot(fname, self._file_path.text(), name_id)
+        # self._th_mw.start()
+        # self.status.setText("mutation wave ongoing")
+    
+    def fitWaveAction(self):
+        try:
+            if self._file_path.text() == "":
+                raise Exception()
+            if self._th_fw:
+                raise NameError()
+        except NameError:
+            self.showDialog("Plotting already", "Alert")
+            return
+        except:
+            self.showDialog("Enter save path", "Alert")
+            return
+        
+        fname = qtWidget.QFileDialog.getOpenFileNames(None, 'Open file', "Z://","Single data files (*.csv);; Binned data files (*.txt);; Matrix data files (*.mtx)")[0] 
+        if fname == "":
+            self.showDialog("No file selected!", "Alert")
+            return
+        name_id = []
+        for i in fname:
+            name_id.append(re.findall('\d+', i)[-1])
+            
+        # self._th_fw = (Thread(target=external_plots.fitWavePlot, args=(fname, self._file_path.text(), name_id)))
+        external_plots.fitWavePlot(fname, self._file_path.text(), name_id)
+        # self._th_fw.start()
+        # self.status.setText("mutation wave ongoing")
+        
+    def clonePlotAction(self):
+        try:
+            if self._file_path.text() == "":
+                raise Exception()
+            if self._th_cp:
+                raise NameError()
+        except NameError:
+            self.showDialog("Plotting already", "Alert")
+            return
+        except:
+            self.showDialog("Enter save path", "Alert")
+            return
+        
+        fname = qtWidget.QFileDialog.getOpenFileNames(None, 'Open file', "Z://","Single data files (*.csv);; Binned data files (*.txt);; Matrix data files (*.mtx)")[0] 
+        if fname == "":
+            self.showDialog("No file selected!", "Alert")
+            return
+        name_id = []
+        for i in fname:
+            name_id.append(re.findall('\d+', i)[-1])
+        
+        # self._th_cp = (Thread(target=external_plots.clonePlot, args=(fname, self._file_path.text(), name_id)))
+        external_plots.clonePlot(fname, self._file_path.text(), name_id)
+        # self._th_cp.start()
+        # self.status.setText("mutation wave ongoing")
     
     def threadTabUI(self):
         self.threadTab = qtWidget.QWidget()
@@ -353,11 +452,20 @@ class mainFormat(qtWidget.QWidget):
         _file_desc_label.setText('Description')
         
         _muller_plot_button = qtWidget.QPushButton(self)
-        _muller_plot_button.setText('Clone diagram')
+        _muller_plot_button.setText('Clone diagram - muller plot')
         _muller_plot_button.clicked.connect(self.mullerPlotAction)
         _clone_hist_button = qtWidget.QPushButton(self)
         _clone_hist_button.setText('Mutations histograms')
         _clone_hist_button.clicked.connect(self.cloneHistAction)
+        _mut_wave = qtWidget.QPushButton(self)
+        _mut_wave.setText('Mutation wave plot')
+        _mut_wave.clicked.connect(self.mutWaveAction)
+        _fit_wave = qtWidget.QPushButton(self)
+        _fit_wave.setText('Fitness wave plot')
+        _fit_wave.clicked.connect(self.fitWaveAction)
+        _clone_plot = qtWidget.QPushButton(self)
+        _clone_plot.setText('Clone plot')
+        _clone_plot.clicked.connect(self.clonePlotAction)
         
         _file_instr_fn = qtWidget.QLabel()
         _file_instr_fn.setText('File name - one cycle file name will appear with cycle number')
@@ -366,19 +474,34 @@ class mainFormat(qtWidget.QWidget):
         _file_instr_fd = qtWidget.QLabel()
         _file_instr_fd.setText('Description - most important information to add to file')
         
-
-        _generalTab.addWidget(_file_name_label, 0, 0)
-        _generalTab.addWidget(self._file_name, 0, 1, 1, 2)
-        _generalTab.addWidget(_file_path_label, 1, 0)
-        _generalTab.addWidget(self._file_path, 1, 1)
-        _generalTab.addWidget(_file_path_button, 1, 2)
-        _generalTab.addWidget(_file_desc_label, 2, 0, 1, 3)
-        _generalTab.addWidget(self._file_desc, 3, 0, 1, 3)
-        _generalTab.addWidget(_muller_plot_button, 4, 0, 1, 3)
-        _generalTab.addWidget(_clone_hist_button, 5, 0, 1, 3)
-        _generalTab.addWidget(_file_instr_fd, 6, 0, 1, 3)
-        _generalTab.addWidget(_file_instr_fn, 7, 0, 1, 3)
-        _generalTab.addWidget(_file_instr_fp, 8, 0, 1, 3)
+        row = 0
+        _generalTab.addWidget(_file_name_label, row, 0)
+        _generalTab.addWidget(self._file_name, row, 1, 1, 2)
+        row = row + 1
+        _generalTab.addWidget(_file_path_label, row, 0)
+        _generalTab.addWidget(self._file_path, row, 1)
+        _generalTab.addWidget(_file_path_button, row, 2)
+        row = row + 1
+        _generalTab.addWidget(_file_desc_label, row, 0, 1, 3)
+        row = row + 1
+        _generalTab.addWidget(self._file_desc, row, 0, 1, 3)
+        row = row + 1
+        _generalTab.addWidget(_muller_plot_button, row, 0, 1, 3)
+        row = row + 1
+        _generalTab.addWidget(_clone_hist_button, row, 0, 1, 3)
+        row = row + 1
+        _generalTab.addWidget(_mut_wave, row, 0, 1, 3)
+        row = row + 1
+        _generalTab.addWidget(_fit_wave, row, 0, 1, 3)
+        row = row + 1
+        _generalTab.addWidget(_clone_plot, row, 0, 1, 3)
+        row = row + 1
+        _generalTab.addWidget(_file_instr_fd, row, 0, 1, 3)
+        row = row + 1
+        _generalTab.addWidget(_file_instr_fn, row, 0, 1, 3)
+        row = row + 1
+        _generalTab.addWidget(_file_instr_fp, row, 0, 1, 3)
+        row = row + 1
         
         generalTab.setLayout(_generalTab)
         return generalTab
@@ -736,9 +859,16 @@ class mainFormat(qtWidget.QWidget):
                 mm.append(sc.sparse.load_npz(row[1]['Mutation matrix']))
             df['Mutation matrix'] = mm
             for i in range(len(df)):
-                df['Driver mutation list'][i] = [int(x.strip('[]')) for x in df['Driver mutation list'][i].split(',')]
-                df['Uniqal passenger mutation list'][i] = [int(x.strip('[]')) for x in df['Uniqal passenger mutation list'][i].split(',')]
-            
+                try:
+                    df.at[i,'Driver mutation list'] = [int(x.strip('[]')) for x in df.loc[i,'Driver mutation list'].split(',')]
+                except ValueError:
+                    df.at[i,'Driver mutation list'] = []
+                    
+                try:
+                    df.at[i,'Uniqal passenger mutation list'] = [int(x.strip('[]')) for x in df.loc[i,'Uniqal passenger mutation list'].split(',')]
+                except ValueError:
+                    df.at[i,'Uniqal passenger mutation list'] = []
+                    
             iPop = df.to_numpy().tolist()
             
             self.status.setText("Started")

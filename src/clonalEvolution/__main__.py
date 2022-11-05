@@ -76,10 +76,11 @@ def _help():
     print("-crit \t \t | print critical population value")
     print("-binned \t | type for binned version (medium priority)")
     print("-matrix \t | type for matrix version (big priority)")
+    print("-plot \t \t | type for matrix version (big priority)")
     print("-----------------------------------------------------")
     print()
     print("To resume simulation provide:")
-    print("-resume (-binned {optional}) -par parameters_file -file file_to_resume (-save {optional})")
+    print("-resume (-binned/matrix {optional}) -par parameters_file -file file_to_resume (-save {optional})")
     print("In path use / symbol not \\ !")
     print()
     print(disclaimer)
@@ -178,6 +179,8 @@ def main():
         p = np.array(sys.argv)
         if len(p[p=='-h']) > 0:
             _help()
+        elif len(p[p=='-plot']) > 0:
+            print('plot')
         elif len(p[p=='-resume']) > 0:
             _in = ""
             _file = ""
@@ -211,9 +214,16 @@ def main():
                     mm.append(sc.sparse.load_npz(row[1]['Mutation matrix']))
                 df['Mutation matrix'] = mm
                 for i in range(len(df)):
-                    df['Driver mutation list'][i] = [int(x.strip('[]')) for x in df['Driver mutation list'][i].split(',')]
-                    df['Uniqal passenger mutation list'][i] = [int(x.strip('[]')) for x in df['Uniqal passenger mutation list'][i].split(',')]
-                
+                    try:
+                        df.at[i,'Driver mutation list'] = [int(x.strip('[]')) for x in df.loc[i,'Driver mutation list'].split(',')]
+                    except ValueError:
+                        df.at[i,'Driver mutation list'] = []
+                        
+                    try:
+                        df.at[i,'Uniqal passenger mutation list'] = [int(x.strip('[]')) for x in df.loc[i,'Uniqal passenger mutation list'].split(',')]
+                    except ValueError:
+                        df.at[i,'Uniqal passenger mutation list'] = []
+                        
                 iPop = df.to_numpy().tolist()
                 
                 CEML.clonalEvolutionMainLoop(iPop, 
