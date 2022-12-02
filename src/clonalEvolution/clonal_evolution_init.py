@@ -194,8 +194,10 @@ def command(queue_data, q, select, iPop, ID, iter_outer, iter_inner, tau, skip, 
                 q.put(['0', str(ID), str(len(iPop))])
             elif select == 1:
                 q.put(['0', str(ID), str(sum([row[1] for row in iPop]))])
+            elif select == 2:
+                q.put(['0', str(ID), str(sum([row[1] for row in iPop]))])
         elif(queue_data[2] == "time"):
-            q.put(['0', str(ID), str((iter_outer-1)*skip + (iter_inner%cycle)*tau)])
+            q.put(['0', str(ID), str((iter_outer) + (iter_inner % round(1/tau))*tau)])
         elif(queue_data[2] == "save"):
             if file_localization == "" or file_name == "":
                 q.put(['0', str(ID), "no path or file, save not active"])
@@ -208,7 +210,7 @@ def command(queue_data, q, select, iPop, ID, iter_outer, iter_inner, tau, skip, 
                                                                 'Mutations_ID': [row[3] for row in iPop],
                                                                 'Mutations_effect': [row[4] for row in iPop],
                                                             }),  
-                                                          file_localization, file_name + '_single', iter_outer - 1 + (iter_inner%cycle)/cycle, ".csv"))
+                                                          file_localization, file_name + '_single', iter_outer + (iter_inner%cycle)/cycle, ".csv"))
                     tsf.start()
                 elif select == 1:
                     tsf = Thread(target=saveToFile, args=(pd.DataFrame({
@@ -220,21 +222,33 @@ def command(queue_data, q, select, iPop, ID, iter_outer, iter_inner, tau, skip, 
                                                                 'Passener mutation list': [row[5] for row in iPop],
                                                                 'Previous clone number': [row[6] for row in iPop]
                                                             }),  
-                                                          file_localization, file_name + '_binned', iter_outer - 1 + (iter_inner%cycle)/cycle, ".txt"))
+                                                          file_localization, file_name + '_binned', iter_outer + (iter_inner%cycle)/cycle, ".txt"))
+                    tsf.start()
+                elif select == 2:
+                    names = []
+                    os.chdir(file_localization)
+                    for clone in iPop:
+                        s_path = 'Data/' + str(iter_outer).replace('.','_') + '/'
+                        try:
+                            os.makedirs(s_path, exist_ok=True) 
+                        except OSError as error:
+                            print(error)
+                        finally:
+                            s_path = s_path + file_name + '_clone_data_' + str(clone[0]) + '.npz'
+                        names.append([s_path, clone[4]])
+                    tsf = Thread(target=saveMatrixData, args=(pd.DataFrame({
+                            'Clone number': copy.deepcopy([row[0] for row in iPop]),
+                            'Cells number': copy.deepcopy([row[1] for row in iPop]),
+                            'Driver mutation list': copy.deepcopy([row[2] for row in iPop]),
+                            'Uniqal passenger mutation list': copy.deepcopy([row[3] for row in iPop]),
+                            'Mutation matrix': copy.deepcopy([row for row in names]),
+                            'Clone fitness': copy.deepcopy([row[5].tolist() for row in iPop]),
+                            'Previous clone number': copy.deepcopy([row[6] for row in iPop])
+                        }), file_localization, file_name + '_matrix', iter_outer + (iter_inner%cycle)/cycle))
                     tsf.start()
         elif(queue_data[2] == "plot"):        
             if select == 0:
-                MUT, CLONE, UNIMT, UNICL, TAB = waveMut_ar([row[0] for row in iPop], [row[2] for row in iPop], 1)
-                sr = wm(MUT, np.ones(len(MUT)))
-                mutWave = pd.DataFrame(TAB) 
-                
-                mutWave.columns = [str(x) for x in mutWave.columns]
-                a = ["mut_num"]
-                b = [str(x) + " " + str(mutWave[str(UNICL.index(x)+1)].sum()) for x in UNICL]
-                a.extend(b)
-                mutWave.columns = a
-                
-                q.put(["-1", str(ID), mutWave]) 
+                q.put(["0", str(ID), "plot not working"]) 
             elif select == 1:
                 df = pd.DataFrame({
                         'Clone': [row[0] for row in iPop],
@@ -255,6 +269,8 @@ def command(queue_data, q, select, iPop, ID, iter_outer, iter_inner, tau, skip, 
                         _CLONES.append(i[2])
                 q.put(['0', str(ID), str(len(_CLONES))])
             elif select == 1:
+                q.put(['0', str(ID), str(len(iPop))])
+            elif select == 2:
                 q.put(['0', str(ID), str(len(iPop))])
     else:
         q.put(queue_data)    
@@ -315,8 +331,9 @@ def plotter(plots, iPop, file_name, file_localization, iter_outer, select):
     elif select == 2:
         if plots & 16:
             names = []
+            os.chdir(file_localization)
             for clone in iPop:
-                s_path = file_localization + '/Data/' + str(iter_outer).replace('.','_') + '/'
+                s_path = 'Data/' + str(iter_outer).replace('.','_') + '/'
                 try:
                     os.makedirs(s_path, exist_ok=True) 
                 except OSError as error:
@@ -324,19 +341,20 @@ def plotter(plots, iPop, file_name, file_localization, iter_outer, select):
                 finally:
                     s_path = s_path + file_name + '_clone_data_' + str(clone[0]) + '.npz'
                 names.append([s_path, clone[4]])
-            
-            tsf = Thread(target=saveMatrixData, args=(pd.DataFrame({
-                                                            'Clone number': [row[0] for row in iPop],
-                                                            'Cells number': [row[1] for row in iPop],
-                                                            'Driver mutation list': [row[2] for row in iPop],
-                                                            'Uniqal passenger mutation list': [row[3] for row in iPop],
-                                                            'Mutation matrix': [row for row in names],
-                                                            'Clone fitness': [row[5] for row in iPop],
-                                                            'Previous clone number': [row[6] for row in iPop]
-                                                        }), file_localization, file_name, iter_outer))
+            df = pd.DataFrame({
+                'Clone number': copy.deepcopy([row[0] for row in iPop]),
+                'Cells number': copy.deepcopy([row[1] for row in iPop]),
+                'Driver mutation list': copy.deepcopy([row[2] for row in iPop]),
+                'Uniqal passenger mutation list': copy.deepcopy([row[3] for row in iPop]),
+                'Mutation matrix': copy.deepcopy([row for row in names]),
+                'Clone fitness': copy.deepcopy([row[5].tolist() for row in iPop]),
+                'Previous clone number': copy.deepcopy([row[6] for row in iPop])
+            })
+            tsf = Thread(target=saveMatrixData, args=(df, file_localization, file_name + '_matrix', copy.copy(iter_outer)))
+            # saveMatrixData(df, file_localization, file_name + '_matrix', copy.copy(iter_outer))
             tsf.start()
 
-def clonalEvolutionMainLoop(iPop, params, file_name="", file_description="", file_localization="", plots=0, t_iter=0, q=None, ID=0, select=0):
+def clonalEvolutionMainLoop(iPop, params, file_name="", file_description="", file_localization="", plots=0, t_iter=-1, q=None, ID=0, select=0):
     """
     Main simulation loop
         iPop: population array where row is in form of: 
@@ -392,33 +410,37 @@ def clonalEvolutionMainLoop(iPop, params, file_name="", file_description="", fil
     resume = 0 + 1*(t_iter>0)
     cycle = round(skip/tau)
     
-    t = time.time()
+    try:
+        os.makedirs(file_localization + '/', exist_ok=True) 
+    except OSError as error:
+        print(error)
     
-    if select == 0 and begin and plots & 16:
+    t = time.time()
+    tx = time.time()
+    if select == 0 and not begin and plots & 16:
         os.makedirs(file_localization, exist_ok=True) 
         FILE = open(file_localization + '/' + file_name + "_muller_plot_single_data.txt", 'w')
         FILE.write("clone, cells, previous clone")
         FILE.write('\n')
         FILE.close()
-    elif select == 1 and begin and plots & 16:        
+    elif select == 1 and not begin and plots & 16:        
         os.makedirs(file_localization, exist_ok=True) 
         FILE = open(file_localization + '/' + file_name + "_muller_plot_binned_data.txt", 'w')
         FILE.write("clone, cells, previous clone")
         FILE.write('\n')
         FILE.close()
-    elif select == 2 and begin and plots & 16:        
+    elif select == 2 and not begin and plots & 16:        
         os.makedirs(file_localization, exist_ok=True) 
         FILE = open(file_localization + '/' + file_name + "_muller_plot_matrix_data.txt", 'w')
         FILE.write("clone, cells, previous clone")
         FILE.write('\n')
         FILE.close()
 
-
     while 1:
         
         ## Data for muller plot
-        if iter_inner % (cycle/skip) == 0 and plots & 16:
-            if select == 0:
+        if iter_inner % (cycle/skip) == 0 or begin:
+            if select == 0 and not begin and plots & 16:
                 FILE = open(file_localization + '/' + file_name + "_muller_plot_single_data.txt", 'a')
                 _CLONES = []
                 _CELLS = []
@@ -433,17 +455,28 @@ def clonalEvolutionMainLoop(iPop, params, file_name="", file_description="", fil
                 FILE.write("".join(["(%.0f, %.0f, %.0f)" % (_CLONES[i], _CELLS[i], _LAST[i]) for i in range(len(_CLONES))]))
                 FILE.write('\n')
                 FILE.close()
-            elif select == 1:
+            elif select == 1 and not begin and plots & 16:
                 FILE = open(file_localization + '/' + file_name + "_muller_plot_binned_data.txt", 'a')
                 FILE.write("".join(["(%.0f, %.0f, %.0f)" % (row[0], row[1], row[6]) for row in iPop]))
                 FILE.write('\n')
                 FILE.close()
-            elif select == 2:
+            elif select == 2 and not begin and plots & 16:
                 FILE = open(file_localization + '/' + file_name + "_muller_plot_matrix_data.txt", 'a')
                 FILE.write("".join(["(%.0f, %.0f, %.0f)" % (row[0], row[1], row[6]) for row in iPop]))
                 FILE.write('\n')
                 FILE.close()
-        
+                
+            iter_outer = iter_outer + 1
+            
+            ## Save data, plots
+            if iter_outer % skip == 0 or begin:
+                begin = 0
+                t = time.time() - t  
+                
+                plotter(plots, iPop, file_name, file_localization, iter_outer, select)                                 
+                
+                t = time.time()
+            
         ## Commands from GUI
         if q != None:
             if not q.empty():
@@ -452,20 +485,26 @@ def clonalEvolutionMainLoop(iPop, params, file_name="", file_description="", fil
 
         if end:
             break
-        
-        ## Save data, plots
-        if iter_inner % cycle == 0 or begin:
-            begin = 0
-            t = time.time() - t  
-            print(str(ID) + ':' + str(t))
-            
-            plotter(plots, iPop, file_name, file_localization, iter_outer, select)                                 
-            
-            iter_outer = iter_outer + 1            
-            t = time.time()
 
-        print_time = not iter_inner % round(cycle/skip)        
-        if iter_outer % steps == 0:
+        print_time = not iter_inner % round(cycle/skip)   
+        if print_time and plots & 16:
+            tx = time.time() - tx
+            if not os.path.exists(file_localization + '/' + "report/"  + file_name + "_report_" + str(ID) + ".txt"):
+                os.makedirs(file_localization + '/' + "report/", exist_ok=True)
+                FILE = open(file_localization + '/' + "report/"  + file_name + "_report_" + str(ID) + ".txt", 'w')
+                FILE.write("threads: %i" % threads)
+                FILE.write('\n')
+                FILE.write(str(ID) + ',' + str(tx))
+                FILE.write('\n')
+                FILE.close()
+            else:
+                FILE = open(file_localization + '/' + "report/"  + file_name + "_report_" + str(ID) + ".txt", 'a')
+                FILE.write(str(ID) + ',' + str(tx))
+                FILE.write('\n')
+                FILE.close()
+            tx = time.time()
+                
+        if iter_outer % steps == 0 and iter_outer > 0:
             print('simulation ended, ID: %i' % ID)
             break
         
@@ -478,4 +517,5 @@ def clonalEvolutionMainLoop(iPop, params, file_name="", file_description="", fil
             
         resume = 0
         iter_inner = iter_inner + 1
+            
     q.put(['ended', ID])

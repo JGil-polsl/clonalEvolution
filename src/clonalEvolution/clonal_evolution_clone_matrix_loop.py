@@ -4,12 +4,15 @@ import scipy as sc
 import math
 import time
 import copy
+import threading
 from threading import Thread
 
 MUTATION_ID = 1
 CLONE_ID = 1
 tx = [0,0,0,0]
 ty = [0,0,0,0]
+sem_mutations = True
+sem_clone = True
 
 '''
     Cellular/Microbial Clonal Evolution simulations basing on Gillespie algorithm.
@@ -43,86 +46,100 @@ def deleteZeroColumn(clone):
     clone[3] = np.array(clone[3])[mask].tolist()
 
 def dying(clone, death):
-    if death > 0:
-        d = np.random.choice(range(clone[1]), size=death, replace=False)
-        mask = np.ones(clone[1], dtype=bool)
-        mask[d] = False
-        clone[4] = clone[4][mask,:]
-        clone[1] = clone[1] - death
+    clone[4] = clone[4][death,:]
+    clone[1] = clone[1] - len(death[death == False])
+    clone[5] = clone[5][death]
 
 def division(clone, divide):
-    if divide > 0:
-        d = np.random.choice(range(clone[1]), size=divide, replace=False)
-        mask = np.zeros(clone[1], dtype=bool)
-        mask[d] = True
-        clone[4] = sc.sparse.vstack([clone[4], copy.deepcopy(clone[4][mask,:])]).tocsr()
-        clone[1] = clone[1] + divide
+    clone[4] = sc.sparse.vstack([clone[4], copy.deepcopy(clone[4][divide,:])]).tocsr()
+    clone[1] = clone[1] + len(divide[divide])
+    clone[5] = np.append(clone[5], clone[5][divide])
 
 def newClone(clone, driver, iPop, mut_effect):
-    global CLONE_ID, MUTATION_ID
-    if driver > 0:
-        for x in range(CLONE_ID, CLONE_ID + driver, 1):
-            d = np.random.choice(range(clone[1]))
-            driv = copy.deepcopy(clone[2])
-            driv.append(MUTATION_ID)
-            iPop.append([x, 1, 
-                        driv, 
-                        copy.deepcopy(clone[3]), 
-                        clone[4].getrow(d), 
-                        clone[5]*(1+mut_effect[0]),
-                        clone[0]])
-            MUTATION_ID = MUTATION_ID + 1
-        CLONE_ID = CLONE_ID + driver
+    global CLONE_ID, MUTATION_ID, sem_clone, sem_mutations
+    new_d = clone[4][driver,:]
+    fit = clone[5][driver]
+    mutations = []
+    clones = []
+    
+    while True:
+        if sem_mutations:
+            sem_mutations = False
+            mutations = [x for x in range(MUTATION_ID, MUTATION_ID + len(fit), 1)]
+            MUTATION_ID = MUTATION_ID + len(fit)
+            sem_mutations = True
+            break
+    while True:
+        if sem_clone:
+            sem_clone = False
+            clones = [x for x in range(CLONE_ID, CLONE_ID + len(fit), 1)]
+            CLONE_ID = CLONE_ID + len(fit)
+            sem_clone = True
+            break
+        
+    if len(fit) == 0:
+        return
+    idx = 0
+    for i in new_d:
+        driv = copy.deepcopy(clone[2])
+        driv.append(mutations[idx])
+        iPop.append([
+            clones[idx], 1,
+            driv,
+            copy.deepcopy(clone[3]),
+            copy.deepcopy(i),
+            np.array([fit[idx]*(1+mut_effect[0])]),
+            clone[0]])
+        idx = idx + 1
 
 def newMutation(clone, passenger, mut_effect):
-    global MUTATION_ID
-    if passenger > 0:
-        f_n = clone[5]/(1-mut_effect[1])*passenger
-        f_o = clone[5]*clone[1]
-        clone[5] = (f_n + f_o)/(clone[1]+passenger)
-        for x in range(MUTATION_ID, MUTATION_ID + passenger, 1):
-            d = np.random.choice(range(clone[1]))
-            clone[3].append(x)
-            clone[4]._shape = (clone[4]._shape[0], clone[4]._shape[1] + 1)
-            clone[4] = sc.sparse.vstack([clone[4], clone[4].getrow(d)]).tocsr()
-            clone[4][clone[4]._shape[0]-1,clone[4]._shape[1]-1] = 1
-            clone[1] = clone[1] + 1
-        MUTATION_ID = MUTATION_ID + passenger
+    global MUTATION_ID, sem_mutations
+    fit = clone[5][passenger]
+    if len(fit) == 0:
+        return
+    mutations = []
+    
+    while True:
+        if sem_mutations:
+            sem_mutations = False
+            mutations = [x for x in range(MUTATION_ID, MUTATION_ID + len(fit), 1)]
+            MUTATION_ID = MUTATION_ID + len(fit)
+            sem_mutations = True
+            break
+        
+    clone[3].extend(mutations)
+    (a,b) = clone[4]._shape
+    clone[4] = sc.sparse.vstack([clone[4], copy.deepcopy(clone[4][passenger,:])]).tocsr()
+    clone[4]._shape = (clone[4]._shape[0], clone[4]._shape[1] + len(fit))
+    (c,d) = clone[4]._shape
+    clone[4][range(a,c,1), range(b,d,1)] = 1
+    clone[1] = clone[1] + len(fit)
+    clone[5] = np.append(clone[5], fit/(1-mut_effect[1]))
 
 def oneCloneCycle(i, iPop, tau, mdt, mut_prob, mut_effect, print_time):
-    pdv = 1 - math.exp(-tau*i[5])
-    pdt = 1 - math.exp(-tau*mdt)
-    
-    pdv = (1-pdt)*pdv
-    pdm_d = (mut_prob[0])*(1 - mut_prob[1])
-    pdm_p = (1 - mut_prob[0])*(mut_prob[1])
-    pdr = (1 - pdt)*(1 - pdv)*(1 - pdm_d)*(1 - pdm_p)
-    
-    r = np.random.multinomial(i[1], [pdt, pdv, pdr])
-    
-    death = r[0]
-    divide = r[1]
-    
-    m = np.random.multinomial(divide, [pdm_p, pdm_d, (1-pdm_p)*(1-pdm_d)])
-
-    m_p = m[0]        
-    m_d = m[1]        
+    death = np.random.exponential(1, i[1])/mdt
+    death = np.where(death < tau, False, True)
 
     time_t = time.time()             
     ## dying cells
-    dying(i, death)
-      
-    tx[0] = tx[0] + (time.time() - time_t) 
-    ty[0] = ty[0] + 1
+    dying(i, death)    
+    tx[1] = tx[1] + (time.time() - time_t) 
+    ty[1] = ty[1] + 1
+    
+    divide = np.random.exponential(1, i[1])/i[5]     
+    divide = np.where(divide < tau, True, False)
+    m_d = np.random.binomial(1, mut_prob[0], i[1])
+    m_d = np.array(m_d, dtype=bool)
+    m_p = np.random.binomial(1, mut_prob[1], i[1])
+    m_p = np.array(m_p, dtype=bool)
+    m_d = np.logical_and(m_d, divide)
+    m_p = np.logical_and(m_p, divide)
+    divide[m_d] = False
+    divide[m_p] = False
+    
     time_t = time.time()     
     ## new clones
     newClone(i, m_d, iPop, mut_effect)
-    
-    tx[1] = tx[1] + (time.time() - time_t) 
-    ty[1] = ty[1] + 1
-    time_t = time.time()     
-    ## division
-    division(i, divide - m_p - m_d)
     
     tx[2] = tx[2] + (time.time() - time_t) 
     ty[2] = ty[2] + 1
@@ -132,13 +149,21 @@ def oneCloneCycle(i, iPop, tau, mdt, mut_prob, mut_effect, print_time):
     
     tx[3] = tx[3] + (time.time() - time_t) 
     ty[3] = ty[3] + 1
+    
+    divide = np.append(divide, np.logical_not(m_p[m_p]))
+    
     time_t = time.time()     
+    ## division
+    division(i, divide)
+    
+    tx[0] = tx[0] + (time.time() - time_t) 
+    ty[0] = ty[0] + 1    
     
     if print_time:
-        if i[1] > 0:
-            print("Clone ID: %i, Population: %i, Mutations: %i, Mean mutation number: %i, Fitness: %.3f" % (i[0], i[1], i[4].count_nonzero(), i[4].count_nonzero()/i[1], i[5]))
-        else:
-            print("Clone ID: %i, Population: %i" % (i[0], i[1]))
+        # if i[1] > 0:
+        #     print("Thread: %i, Clone ID: %i, Population: %i, Mutations: %i, Mean mutation number: %i, Fitness: %.3f" % (threading.get_ident(), i[0], i[1], i[4].count_nonzero(), i[4].count_nonzero()/i[1], np.mean(i[5])))
+        # else:
+        #     print("Clone ID: %i, Population: %i" % (i[0], i[1]))
                 ##delete mutation with 0 occurences
         deleteZeroColumn(i)
         
@@ -171,6 +196,27 @@ def clonalEvolutionCloneMatrixLoop(iPop, cap, tau, mut_prob, mut_effect, resume,
             q: common queue
             THREADS: threads number used in simulation         
     """   
+    if resume:
+        max_cl = 0
+        max_mut = 0
+        for x in iPop:
+            if x[0] > max_cl:
+                max_cl = x[0]
+            try:
+                if max(x[3]) > max_mut:
+                    max_mut = max(x[3])
+            except ValueError:
+                continue
+                
+            try:
+                if max(x[2]) > max_mut:
+                    max_mut = max(x[2])
+            except ValueError:
+                continue
+            
+        CLONE_ID = max_cl + 1
+        MUTATION_ID = max_mut + 1
+    
     popSize = sum([row[1] for row in iPop])
     mdt = popSize/cap
     
@@ -185,6 +231,7 @@ def clonalEvolutionCloneMatrixLoop(iPop, cap, tau, mut_prob, mut_effect, resume,
     develope = []
     for i in t:
         develope.append(Thread(target=cloneCycles, args=(i, iPop, tau, mdt, mut_prob, mut_effect, print_time)))
+        # cloneCycles(i, iPop, tau, mdt, mut_prob, mut_effect, print_time)
         develope[len(develope) - 1].start()        
         
     for i in develope:

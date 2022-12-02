@@ -25,14 +25,10 @@ import scipy as sc
 
 def clonePlot(paths_in, paths_out, ids):
     prop = np.transpose([paths_in, ids])
-    for path_in, _id in prop:
-        if not path_in.endswith('.txt'):
-            print("Wrong file")
-            return
+    for path_in, _id in prop:     
         
-        path_out = paths_out + '/Figures/' + _id
-        if not paths_out.endswith('/'):
-            path_out = path_out + '/'
+        os.chdir(paths_out)
+        path_out = paths_out + '/Figures/' + _id + '/'
             
         df = []
         if path_in.endswith('.csv'):
@@ -42,35 +38,61 @@ def clonePlot(paths_in, paths_out, ids):
         elif path_in.endswith('.mtx'):
             df = pd.read_csv(path_in)
             
-            mm = []
-            for row in df.iterrows():
-                mm.append(sc.sparse.load_npz(row[1]['Mutation matrix']))
+            # mm = []
+            # for row in df.iterrows():
+            #     mm.append(sc.sparse.load_npz(row[1]['Mutation matrix']))
                 
-            df['Mutation matrix'] = mm
+            # df['Mutation matrix'] = mm
 
-            for i in range(len(df)):
-                try:
-                    df.at[i,'Driver mutation list'] = [int(x.strip('[]')) for x in df.loc[i,'Driver mutation list'].split(',')]
-                except ValueError:
-                    df.at[i,'Driver mutation list'] = []
+            # for i in range(len(df)):
+            #     try:
+            #         df.at[i,'Driver mutation list'] = [int(x.strip('[]')) for x in df.loc[i,'Driver mutation list'].split(',')]
+            #     except ValueError:
+            #         df.at[i,'Driver mutation list'] = []
                     
-                try:
-                    df.at[i,'Uniqal passenger mutation list'] = [int(x.strip('[]')) for x in df.loc[i,'Uniqal passenger mutation list'].split(',')]
-                except ValueError:
-                    df.at[i,'Uniqal passenger mutation list'] = []
+            #     try:
+            #         df.at[i,'Uniqal passenger mutation list'] = [int(x.strip('[]')) for x in df.loc[i,'Uniqal passenger mutation list'].split(',')]
+            #     except ValueError:
+            #         df.at[i,'Uniqal passenger mutation list'] = []
+                    
+            #     try:
+            #         df.at[i,'Clone fitness'] = np.array([float(x.strip('[]')) for x in df.loc[i,'Clone fitness'].split(',')])
+            #     except ValueError:
+            #         df.at[i,'Clone fitness'] = np.array([])
+            
+            clones = pd.DataFrame({
+                    'Clone': df['Clone number'].tolist(),
+                    'Cells number': df['Cells number'].tolist(),
+                })
+            fig = plt.figure()
+            ax = fig.add_subplot(111)  
+            ax.bar([x for x in range(len(clones['Clone']))], clones['Cells number'])
+            ax.set_title("Population: %i, Clones: %i" % (sum(clones['Cells number']), len(clones['Clone'])))
+            ax.set_xticks([x for x in range(len(clones['Clone']))], [str(x) for x in clones['Clone']])
+            ax.set_xlabel("Clone")
+            ax.set_ylabel("Cells count")
+            
+            try:
+                os.makedirs(path_out, exist_ok=True) 
+            except OSError as error:
+                print(error)
+            finally:
+                if os.path.exists(path_out + "%s_clones.jpg" % _id):
+                    os.remove(path_out + "%s_clones.jpg" % _id)
+                fig.savefig(path_out + "%s_clones.jpg" % _id)
+                plt.close(fig)            
         else:
-            break 
+            print("Wrong file: %s" % path_in)
+            continue 
         
 def mutWavePlot(paths_in, paths_out, ids):
     prop = np.transpose([paths_in, ids])
+    print("mutation")
+    print(prop)
     for path_in, _id in prop:
-        if not path_in.endswith('.txt'):
-            print("Wrong file")
-            return
         
-        path_out = paths_out + '/Figures/' + _id
-        if not paths_out.endswith('/'):
-            path_out = path_out + '/'
+        os.chdir(paths_out)
+        path_out = paths_out + '/Figures/' + _id + '/'
             
         df = []
         if path_in.endswith('.csv'):
@@ -82,33 +104,54 @@ def mutWavePlot(paths_in, paths_out, ids):
             
             mm = []
             for row in df.iterrows():
-                mm.append(sc.sparse.load_npz(row[1]['Mutation matrix']))
+                try:
+                    mm.append(sc.sparse.load_npz(row[1]['Mutation matrix']))
+                except FileNotFoundError:
+                    print("No data file found, check directory")
+                    continue
                 
             df['Mutation matrix'] = mm
+            
+            # for i in range(len(df)):
+            #     try:
+            #         df.at[i,'Driver mutation list'] = [int(x.strip('[]')) for x in df.loc[i,'Driver mutation list'].split(',')]
+            #     except ValueError:
+            #         df.at[i,'Driver mutation list'] = []
+            
+            mutations = []
+            freq = []
+            for i in df.iterrows():
+                t = np.array(list(map(lambda x: x.count_nonzero(), i[1]["Mutation matrix"]))) # + len(i["Driver mutation list"])
+                mutations.extend(t)
+            
+            fig = plt.figure()
+            ax = fig.add_subplot(111)  
+            ax.hist(mutations)
+            ax.set_title(("Mutation wave, Population: %i") % sum(df["Cells number"]))
+            ax.set_xlabel("Mutation number")
+            ax.set_ylabel("Cells count")
 
-            for i in range(len(df)):
-                try:
-                    df.at[i,'Driver mutation list'] = [int(x.strip('[]')) for x in df.loc[i,'Driver mutation list'].split(',')]
-                except ValueError:
-                    df.at[i,'Driver mutation list'] = []
-                    
-                try:
-                    df.at[i,'Uniqal passenger mutation list'] = [int(x.strip('[]')) for x in df.loc[i,'Uniqal passenger mutation list'].split(',')]
-                except ValueError:
-                    df.at[i,'Uniqal passenger mutation list'] = []
+            try:
+                os.makedirs(path_out, exist_ok=True) 
+            except OSError as error:
+                print(error)
+            finally:
+                if os.path.exists(path_out + "%s_mutation_wave.jpg" % _id):
+                    os.remove(path_out + "%s_mutation_wave.jpg" % _id)
+                fig.savefig(path_out + "%s_mutation_wave.jpg" % _id)
+                plt.close(fig)            
         else:
-            break        
+            print("Wrong file: %s" % path_in)
+            continue        
 
 def fitWavePlot(paths_in, paths_out, ids):
     prop = np.transpose([paths_in, ids])
+    print("fitness")
+    print(prop)
     for path_in, _id in prop:
-        if not path_in.endswith('.txt'):
-            print("Wrong file")
-            return
         
-        path_out = paths_out + '/Figures/' + _id
-        if not paths_out.endswith('/'):
-            path_out = path_out + '/'
+        os.chdir(paths_out)
+        path_out = paths_out + '/Figures/' + _id + '/'
             
         df = []
         if path_in.endswith('.csv'):
@@ -120,22 +163,44 @@ def fitWavePlot(paths_in, paths_out, ids):
             
             mm = []
             for row in df.iterrows():
-                mm.append(sc.sparse.load_npz(row[1]['Mutation matrix']))
+                try:
+                    mm.append(sc.sparse.load_npz(row[1]['Mutation matrix']))
+                except FileNotFoundError:
+                    print("No data file found, check directory")
+                    continue
                 
             df['Mutation matrix'] = mm
 
-            for i in range(len(df)):
+            for i in range(len(df)):                    
                 try:
-                    df.at[i,'Driver mutation list'] = [int(x.strip('[]')) for x in df.loc[i,'Driver mutation list'].split(',')]
+                    df.at[i,'Clone fitness'] = np.array([float(x.strip('[]')) for x in df.loc[i,'Clone fitness'].split(',')])
                 except ValueError:
-                    df.at[i,'Driver mutation list'] = []
-                    
-                try:
-                    df.at[i,'Uniqal passenger mutation list'] = [int(x.strip('[]')) for x in df.loc[i,'Uniqal passenger mutation list'].split(',')]
-                except ValueError:
-                    df.at[i,'Uniqal passenger mutation list'] = []
+                    df.at[i,'Clone fitness'] = np.array([])
+            
+            fitness = []     
+            for i in df.iterrows():
+                fitness.extend(i[1]['Clone fitness'])
+            
+            fig = plt.figure()
+            ax = fig.add_subplot(111)  
+            bins = round((max(fitness) - min(fitness))/0.1)
+            ax.hist(fitness, bins=100)
+            ax.set_title(("Mutation wave, Population: %i") % sum(df["Cells number"]))
+            ax.set_xlabel("Mutation number")
+            ax.set_ylabel("Cells count")        
+            
+            try:
+                os.makedirs(path_out, exist_ok=True) 
+            except OSError as error:
+                print(error)
+            finally:
+                if os.path.exists(path_out + "%s_fitness_wave.jpg" % _id):
+                    os.remove(path_out + "%s_fitness_wave.jpg" % _id)
+                fig.savefig(path_out + "%s_fitness_wave.jpg" % _id)
+                plt.close(fig)            
         else:
-            break 
+            print("Wrong file: %s" % path_in)
+            continue  
 
 def mullerPlot(path_in, path_out):   
     '''
@@ -378,9 +443,9 @@ def binnedHist(paths_in, paths_out, ids):
             except OSError as error:
                 print(error)
             finally:
-                if os.path.exists(path_out + "clone_mutations_VAF_%i.jpg"%x):
-                    os.remove(path_out + "clone_mutations_VAF_%i.jpg"%x)
-                fig.savefig(path_out + "clone_mutations_VAF_%i.jpg"%x)
+                if os.path.exists(path_out + "%s_clone_mutations_VAF_%i.jpg"%(_id,x)):
+                    os.remove(path_out + "%s_clone_mutations_VAF_%i.jpg"%(_id,x))
+                fig.savefig(path_out + "%s_clone_mutations_VAF_%i.jpg"%(_id,x))
                 plt.close(fig)
         
     
@@ -421,9 +486,9 @@ def binnedHist(paths_in, paths_out, ids):
                 except OSError as error:
                     print(error)
                 finally:
-                    if os.path.exists(path_out + "clone_mutations_VAF_ID_" + str(int(row[1]['Clone number'])) +".jpg"):
-                        os.remove(path_out + "clone_mutations_VAF_ID_" + str(int(row[1]['Clone number'])) +".jpg")
-                    fig.savefig(path_out + "clone_mutations_VAF_ID_" + str(int(row[1]['Clone number'])) +".jpg")
+                    if os.path.exists(path_out + "%s_clone_mutations_VAF_ID_" % _id + str(int(row[1]['Clone number'])) +".jpg"):
+                        os.remove(path_out + "%s_clone_mutations_VAF_ID_" % _id + str(int(row[1]['Clone number'])) +".jpg")
+                    fig.savefig(path_out + "%s_clone_mutations_VAF_ID_" % _id + str(int(row[1]['Clone number'])) +".jpg")
                     plt.close(fig)
             else:
                 continue
@@ -438,7 +503,7 @@ def matrixHist(paths_in, paths_out, ids):
         if not path_in.endswith('.mtx'):
             print("Wrong file")
             return
-        
+        os.chdir(paths_out)
         path_out = paths_out + '/Figures/' + _id
         if not path_out.endswith('/'):
             path_out = path_out + '/'
@@ -447,7 +512,11 @@ def matrixHist(paths_in, paths_out, ids):
         
         mm = []
         for row in df.iterrows():
-            mm.append(sc.sparse.load_npz(row[1]['Mutation matrix']))
+            try:
+                mm.append(sc.sparse.load_npz(row[1]['Mutation matrix']))
+            except FileNotFoundError:
+                print("No data file found, check directory")
+                continue
             
         df['Mutation matrix'] = mm
 
@@ -461,6 +530,11 @@ def matrixHist(paths_in, paths_out, ids):
                 df.at[i,'Uniqal passenger mutation list'] = [int(x.strip('[]')) for x in df.loc[i,'Uniqal passenger mutation list'].split(',')]
             except ValueError:
                 df.at[i,'Uniqal passenger mutation list'] = []
+                
+            try:
+                df.at[i,'Clone fitness'] = np.array([float(x.strip('[]')) for x in df.loc[i,'Clone fitness'].split(',')])
+            except ValueError:
+                df.at[i,'Clone fitness'] = np.array([])
                 
         popSize = sum(df['Cells number'])
         
@@ -476,7 +550,7 @@ def matrixHist(paths_in, paths_out, ids):
             muts = df['Uniqal passenger mutation list'][i] 
             driv = df['Driver mutation list'][i]
             freqs = df['Mutation matrix'][i]
-            freqs = [freqs[:,x].count_nonzero() for x in range(freqs._shape[1])]
+            freqs = list(map(lambda x: x.count_nonzero(), freqs.T))
             muts = np.array(muts)[0:len(freqs)].tolist()
             for m in muts:
                 a = freqs[muts.index(m)]     
@@ -489,7 +563,7 @@ def matrixHist(paths_in, paths_out, ids):
             pFreq[len(pFreq[:,0])-1,i] = sum(pFreq[:,i])
         
         pFreq = pFreq.T
-        pFreq = pFreq[pFreq[:,1] != 0]
+        pFreq = pFreq[pFreq[:,len(pFreq[0,:])-1] != 0]
         pFreq = pFreq.T
         if not np.any(pFreq):
             print(_id + ": no value to plot")
@@ -543,14 +617,14 @@ def matrixHist(paths_in, paths_out, ids):
             except OSError as error:
                 print(error)
             finally:
-                if os.path.exists(path_out + "clone_mutations_VAF_%i.jpg"%x):
-                    os.remove(path_out + "clone_mutations_VAF_%i.jpg"%x)
-                fig.savefig(path_out + "clone_mutations_VAF_%i.jpg"%x)
+                if os.path.exists(path_out + "%s_clone_mutations_VAF_%i.jpg"%(_id,x)):
+                    os.remove(path_out + "%s_clone_mutations_VAF_%i.jpg"%(_id,x))
+                fig.savefig(path_out + "%s_clone_mutations_VAF_%i.jpg"%(_id,x))
                 plt.close(fig)
         
         for clone in df.iterrows():
             freqs = clone[1]['Mutation matrix']        
-            _sum = [freqs[:,x].count_nonzero() for x in range(freqs._shape[1])]
+            _sum = list(map(lambda x: x.count_nonzero(), freqs.T))
             freqs = [1 for x in range(freqs._shape[1])]
             
             pl = np.zeros(len(freqs)).tolist()
@@ -603,9 +677,9 @@ def matrixHist(paths_in, paths_out, ids):
             except OSError as error:
                 print(error)
             finally:
-                if os.path.exists(path_out + "clone_mutations_VAF_ID_" + str(int(clone[1]['Clone number'])) +".jpg"):
-                    os.remove(path_out + "clone_mutations_VAF_ID_" + str(int(clone[1]['Clone number'])) +".jpg")
-                fig.savefig(path_out + "clone_mutations_VAF_ID_" + str(int(clone[1]['Clone number'])) +".jpg")
+                if os.path.exists(path_out + "%s_clone_mutations_VAF_ID_" % _id + str(int(clone[1]['Clone number'])) +".jpg"):
+                    os.remove(path_out + "%s_clone_mutations_VAF_ID_" % _id + str(int(clone[1]['Clone number'])) +".jpg")
+                fig.savefig(path_out + "%s_clone_mutations_VAF_ID_" % _id + str(int(clone[1]['Clone number'])) +".jpg")
                 plt.close(fig)           
 
 def singleHist(paths_in, paths_out, ids):
@@ -706,16 +780,16 @@ def singleHist(paths_in, paths_out, ids):
         except TypeError:
             print(_id + ": no numeric data to plot")
             continue
-        
+        x = 0
         fig = ax.get_figure()
         try:
             os.makedirs(path_out, exist_ok=True) 
         except OSError as error:
             print(error)
         finally:
-            if os.path.exists(path_out + "population_mutations_VAF.jpg"):
-                os.remove(path_out + "population_mutations_VAF.jpg")
-            fig.savefig(path_out + "population_mutations_VAF.jpg")
+            if os.path.exists(path_out + "%s_clone_mutations_VAF_%i.jpg"%(_id,x)):
+                os.remove(path_out + "%s_clone_mutations_VAF_%i.jpg"%(_id,x))
+            fig.savefig(path_out + "%s_clone_mutations_VAF_%i.jpg"%(_id,x))
             plt.close(fig)
         
         for i in range(len(clones)):
@@ -735,12 +809,12 @@ def singleHist(paths_in, paths_out, ids):
             except OSError as error:
                 print(error)
             finally:
-                if os.path.exists(path_out + "clone_mutations_VAF_ID_" + str(clones[i]) +".jpg"):
-                    os.remove(path_out + "clone_mutations_VAF_ID_" + str(clones[i]) +".jpg")
-                fig.savefig(path_out + "clone_mutations_VAF_ID_" + str(clones[i]) +".jpg")
+                if os.path.exists(path_out + "%s_clone_mutations_VAF_ID_" % _id + str(clones[i]) +".jpg"):
+                    os.remove(path_out + "%s_clone_mutations_VAF_ID_" % _id + str(clones[i]) +".jpg")
+                fig.savefig(path_out + "%s_clone_mutations_VAF_ID_" % _id + str(clones[i]) +".jpg")
                 plt.close(fig)
                 print("saving files %.1f %%" % (i/len(clones) * 100))
             
-# if __name__ == "__main__":
-#     matrixHist("E:\Simulations\Clonal Evolution\Mutation matrix aproach\mm_400.mtx", 
-#                "E:\Simulations\Clonal Evolution\Mutation matrix aproach\Figures\\400")
+if __name__ == "__main__":
+    fitWavePlot(["E:\\Simulations\\Publication\\Normal Test S B M\\m3\\m3_matrix_3500.mtx"], 
+                "E:\\Simulations\\Publication\\Normal Test S B M\\m3", [3500])

@@ -1,4 +1,5 @@
 import sys
+import os
 import copy
 from pathlib import Path
 import numpy as np
@@ -206,6 +207,8 @@ def main():
             print(output)
             print(cycle)
             
+            os.chdir(output)
+            
             if len(p[p=='-matrix'])>0:
                 df = pd.read_csv(_file)
                 df = df.drop('Unnamed: 0', axis=1)
@@ -223,6 +226,11 @@ def main():
                         df.at[i,'Uniqal passenger mutation list'] = [int(x.strip('[]')) for x in df.loc[i,'Uniqal passenger mutation list'].split(',')]
                     except ValueError:
                         df.at[i,'Uniqal passenger mutation list'] = []
+                        
+                    try:
+                        df.at[i,'Clone fitness'] = np.array([float(x.strip('[]')) for x in df.loc[i,'Clone fitness'].split(',')])
+                    except ValueError:
+                        df.at[i,'Clone fitness'] = np.array([])
                         
                 iPop = df.to_numpy().tolist()
                 
@@ -319,7 +327,7 @@ def main():
                     plots = 16   
                     
             if len(p[p=='-matrix'])>0:
-                iPop = [[0, dfp['pop'][0], [], [0], sc.sparse.csr_matrix(np.array([[0] for x in range(dfp['pop'][0])])), 1, 0]]
+                iPop = [[0, dfp['pop'][0], [], [0], sc.sparse.csr_matrix(np.array([[0] for x in range(dfp['pop'][0])])), np.ones(dfp['pop'][0]), 0]]
                 CEML.clonalEvolutionMainLoop(iPop,
                                              copy.deepcopy([dfp['pop'][0], dfp['cap'][0], dfp['steps'][0], dfp['tau'][0], dfp['skip'][0], dfp['mut_prob'][0], dfp['mut_effect'][0], dfp['threads'][0]]), 
                                              name, "", output, plots, select=2)

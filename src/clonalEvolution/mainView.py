@@ -20,6 +20,7 @@ import PyQt5.QtWidgets as qtWidget
 import PyQt5.QtGui as qtGui
 from PyQt5.QtCore import Qt
 import sys
+import os
 import pandas as pd
 import numpy as np
 import re
@@ -34,8 +35,8 @@ disclaimer = '''Cellular/Microbial Clonal Evolution simulations basing on Gilles
 from pathlib import Path 
 import time
 import matplotlib.pyplot as plt
-from threading import Thread
 from multiprocessing import Process, Queue
+from threading import Thread
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 import copy
@@ -54,11 +55,11 @@ class mainFormat(qtWidget.QWidget):
         self.th_s = []
         self.s_ID = []
         self.q = Queue()
-        self._th_muller = []
-        self._th_hist = []
-        self._th_mw = []
-        self._th_fw = []
-        self._th_cp = []
+        self._th_muller = Thread()
+        self._th_hist = Thread()
+        self._th_mw = Thread()
+        self._th_fw = Thread()
+        self._th_cp = Thread()
         self.createMainView()
         self._monitor = True
         self.th_monitor = Thread(target=self.monitor, args=(self.q, self.status))
@@ -133,6 +134,7 @@ class mainFormat(qtWidget.QWidget):
                         self.th_s[index].join()
                         self.th_s.remove(self.th_s[index])
                         self.idx_s = self.idx_s - 1
+                        self.status.setText("Ended")
                     except:
                         temp = list(map(lambda x: (x.split(',')[0]), self.r_ID))
                         index = temp.index(str(ID))
@@ -140,19 +142,37 @@ class mainFormat(qtWidget.QWidget):
                         self.th_r[index].join()
                         self.th_r.remove(self.th_r[index])
                         self.idx_r = self.idx_r - 1
+                        self.status.setText("Ended")
+                    if not self.th_r and not self.th_s:
+                        self.status.setStyleSheet("background-color: red")
                 else:
                     q.put(data)
-            if self._th_muller:
-                if self._th_muller.is_alive():
-                    self._th_muller.join()                    
+            if self._th_muller.is_alive():
+                self._th_muller.join(1) 
+                if not self._th_muller.is_alive():                   
                     self.status.setText("muller plot done")
-                    self._th_muller = None
-            if self._th_hist:
-                if self._th_hist.is_alive():
-                    self._th_hist.join()                    
+                    # self._th_muller = None
+            if self._th_hist.is_alive():
+                self._th_hist.join(1)     
+                if not self._th_hist.is_alive():               
                     self.status.setText("histograms done")
-                    self._th_hist = None
-    
+                    # self._th_hist = None
+            if self._th_mw.is_alive():
+                self._th_mw.join(1)   
+                if not self._th_mw.is_alive():                 
+                    self.status.setText("mutation wave done")
+                    # self._th_mw = None
+            if self._th_fw.is_alive():
+                self._th_fw.join(1) 
+                if not self._th_fw.is_alive():                   
+                    self.status.setText("fitness wave done")
+                    # self._th_fw = None
+            if self._th_cp.is_alive():
+                self._th_cp.join(1)   
+                if not self._th_cp.is_alive():                 
+                    self.status.setText("clone plot done")
+                    # self._th_cp = None
+                
     def closeEvent(self, event):
         
         for i in self.s_ID:
@@ -165,10 +185,16 @@ class mainFormat(qtWidget.QWidget):
         for i in self.th_s:
             i.join()
             
-        if self._th_muller:
-            self._th_muller[0].join()
-        if self._th_hist:
-            self._th_hist[0].join()
+        if self._th_muller.is_alive():
+            self._th_muller.join()
+        if self._th_hist.is_alive():
+            self._th_hist.join()
+        if self._th_mw.is_alive():
+            self._th_mw.join()
+        if self._th_fw.is_alive():
+            self._th_fw.join()
+        if self._th_cp.is_alive():
+            self._th_cp.join()
             
         plt.close(self._fig)
         self.q.put(['exit'])
@@ -187,26 +213,7 @@ class mainFormat(qtWidget.QWidget):
         ID = msg[0]
         msg = msg[1]
         self.q.put(['1',ID,msg])
-        index = 0
-        if msg == "exit":
-            try:
-                temp = list(map(lambda x: (x.split(',')[0]), self.s_ID))
-                index = temp.index(str(ID))
-                self.s_ID.remove(self.s_ID[index])
-                self.th_s[index].join()
-                self.th_s.remove(self.th_s[index])
-                self.idx_s = self.idx_s - 1
-            except:
-                temp = list(map(lambda x: (x.split(',')[0]), self.r_ID))
-                index = temp.index(str(ID))
-                self.r_ID.remove(self.r_ID[index])
-                self.th_r[index].join()
-                self.th_r.remove(self.th_r[index])
-                self.idx_r = self.idx_r - 1
-            
-            self.status.setText("Stopped")
-            if not self.th_r and not self.th_s:
-                self.status.setStyleSheet("background-color: red")
+        index = 0                
     
     def createCanvasView(self):
         self.canvasTab = qtWidget.QWidget()
@@ -279,7 +286,7 @@ class mainFormat(qtWidget.QWidget):
         try:
             if self._file_path.text() == "":
                 raise Exception()
-            if self._th_muller:
+            if self._th_muller.is_alive():
                 raise NameError()
         except NameError:
             self.showDialog("Plotting already", "Alert")
@@ -300,7 +307,7 @@ class mainFormat(qtWidget.QWidget):
         try:
             if self._file_path.text() == "":
                 raise Exception()
-            if self._th_hist:
+            if self._th_hist.is_alive():
                 raise NameError()
         except NameError:
             self.showDialog("Plotting already", "Alert")
@@ -309,7 +316,7 @@ class mainFormat(qtWidget.QWidget):
             self.showDialog("Enter save path", "Alert")
             return
         fname = qtWidget.QFileDialog.getOpenFileNames(None, 'Open file', "Z://","Single data files (*.csv);; Binned data files (*.txt);; Matrix data files (*.mtx)")[0] 
-        if fname == "":
+        if len(fname) == 0:
             self.showDialog("No file selected!", "Alert")
             return
         name_id = []
@@ -337,7 +344,7 @@ class mainFormat(qtWidget.QWidget):
         try:
             if self._file_path.text() == "":
                 raise Exception()
-            if self._th_mw:
+            if self._th_mw.is_alive():
                 raise NameError()
         except NameError:
             self.showDialog("Plotting already", "Alert")
@@ -347,23 +354,23 @@ class mainFormat(qtWidget.QWidget):
             return
         
         fname = qtWidget.QFileDialog.getOpenFileNames(None, 'Open file', "Z://","Single data files (*.csv);; Binned data files (*.txt);; Matrix data files (*.mtx)")[0] 
-        if fname == "":
+        if len(fname) == 0:
             self.showDialog("No file selected!", "Alert")
             return
         name_id = []
         for i in fname:
             name_id.append(re.findall('\d+', i)[-1])
             
-        # self._th_mw = (Thread(target=external_plots.mutWavePlot, args=(fname, self._file_path.text(), name_id)))
-        external_plots.mutWavePlot(fname, self._file_path.text(), name_id)
-        # self._th_mw.start()
-        # self.status.setText("mutation wave ongoing")
+        self._th_mw = (Thread(target=external_plots.mutWavePlot, args=(fname, self._file_path.text(), name_id)))
+        # external_plots.mutWavePlot(fname, self._file_path.text(), name_id)
+        self._th_mw.start()
+        self.status.setText("mutation wave ongoing")
     
     def fitWaveAction(self):
         try:
             if self._file_path.text() == "":
                 raise Exception()
-            if self._th_fw:
+            if self._th_fw.is_alive():
                 raise NameError()
         except NameError:
             self.showDialog("Plotting already", "Alert")
@@ -373,23 +380,23 @@ class mainFormat(qtWidget.QWidget):
             return
         
         fname = qtWidget.QFileDialog.getOpenFileNames(None, 'Open file', "Z://","Single data files (*.csv);; Binned data files (*.txt);; Matrix data files (*.mtx)")[0] 
-        if fname == "":
+        if len(fname) == 0:
             self.showDialog("No file selected!", "Alert")
             return
         name_id = []
         for i in fname:
             name_id.append(re.findall('\d+', i)[-1])
             
-        # self._th_fw = (Thread(target=external_plots.fitWavePlot, args=(fname, self._file_path.text(), name_id)))
-        external_plots.fitWavePlot(fname, self._file_path.text(), name_id)
-        # self._th_fw.start()
-        # self.status.setText("mutation wave ongoing")
+        self._th_fw = (Thread(target=external_plots.fitWavePlot, args=(fname, self._file_path.text(), name_id)))
+        # external_plots.fitWavePlot(fname, self._file_path.text(), name_id)
+        self._th_fw.start()
+        self.status.setText("fitness wave ongoing")
         
     def clonePlotAction(self):
         try:
             if self._file_path.text() == "":
                 raise Exception()
-            if self._th_cp:
+            if self._th_cp.is_alive():
                 raise NameError()
         except NameError:
             self.showDialog("Plotting already", "Alert")
@@ -399,17 +406,17 @@ class mainFormat(qtWidget.QWidget):
             return
         
         fname = qtWidget.QFileDialog.getOpenFileNames(None, 'Open file', "Z://","Single data files (*.csv);; Binned data files (*.txt);; Matrix data files (*.mtx)")[0] 
-        if fname == "":
+        if len(fname) == 0:
             self.showDialog("No file selected!", "Alert")
             return
         name_id = []
         for i in fname:
             name_id.append(re.findall('\d+', i)[-1])
         
-        # self._th_cp = (Thread(target=external_plots.clonePlot, args=(fname, self._file_path.text(), name_id)))
-        external_plots.clonePlot(fname, self._file_path.text(), name_id)
-        # self._th_cp.start()
-        # self.status.setText("mutation wave ongoing")
+        self._th_cp = (Thread(target=external_plots.clonePlot, args=(fname, self._file_path.text(), name_id)))
+        # external_plots.clonePlot(fname, self._file_path.text(), name_id)
+        self._th_cp.start()
+        self.status.setText("clone plot ongoing")
     
     def threadTabUI(self):
         self.threadTab = qtWidget.QWidget()
@@ -425,11 +432,17 @@ class mainFormat(qtWidget.QWidget):
         _threadTab.addRow(qtWidget.QLabel("Resumed"), qtWidget.QLabel())
         for i in self.r_ID:
             _threadTab.addRow(qtWidget.QLabel("ID: " + str(i)), qtWidget.QLabel()) 
-        if self._th_muller:
+        if self._th_muller.is_alive():
             _threadTab.addRow(qtWidget.QLabel("muller plot"), qtWidget.QLabel()) 
-        if self._th_hist:
+        if self._th_hist.is_alive():
             _threadTab.addRow(qtWidget.QLabel("histograms plot"), qtWidget.QLabel()) 
-
+        if self._th_mw.is_alive():
+            _threadTab.addRow(qtWidget.QLabel("mutation wave"), qtWidget.QLabel()) 
+        if self._th_fw.is_alive():
+            _threadTab.addRow(qtWidget.QLabel("fitness wave"), qtWidget.QLabel()) 
+        if self._th_cp.is_alive():
+            _threadTab.addRow(qtWidget.QLabel("clone plot"), qtWidget.QLabel()) 
+            
         self.threadTab.setLayout(_threadTab)
         return self.threadTab        
         
@@ -714,7 +727,7 @@ class mainFormat(qtWidget.QWidget):
                   copy.deepcopy([pop, cap, steps, tau, skip, mut_prob, mut_effect, threads]), 
                   self._file_name.text(), 
                   self._file_desc.text(), 
-                  self._file_path.text(), plots, 0, self.q, self.ID, 1)))
+                  self._file_path.text(), plots, -1, self.q, self.ID, 1)))
             self.s_ID.append(str(self.ID) + ", binned")
             
         elif self._single.isChecked():        
@@ -737,10 +750,10 @@ class mainFormat(qtWidget.QWidget):
                                                         copy.deepcopy([pop, cap, steps, tau, skip, mut_prob, mut_effect, threads]), 
                                                         self._file_name.text(), 
                                                         self._file_desc.text(), 
-                                                        self._file_path.text(), plots, 0, self.q, self.ID, 0)))               
+                                                        self._file_path.text(), plots, -1, self.q, self.ID, 0)))               
             self.s_ID.append(str(self.ID) + ", single")
         elif self._matrix.isChecked():
-            iPop = [[0, pop, [], [0], sc.sparse.csr_matrix(np.array([[0] for x in range(pop)])), 1, 0]]
+            iPop = [[0, pop, [], [0], sc.sparse.csr_matrix(np.array([[0] for x in range(pop)])), np.ones(pop), 0]]
             
             self.status.setText("Started")
             self.status.setStyleSheet("background-color: green")
@@ -751,7 +764,13 @@ class mainFormat(qtWidget.QWidget):
                 copy.deepcopy([pop, cap, steps, tau, skip, mut_prob, mut_effect, threads]),
                 self._file_name.text(), 
                 self._file_desc.text(), 
-                self._file_path.text(), plots, 0, self.q, self.ID, 2)))
+                self._file_path.text(), plots, -1, self.q, self.ID, 2)))
+            # clonalEvolutionMainLoop(
+            #     iPop, 
+            #     copy.deepcopy([pop, cap, steps, tau, skip, mut_prob, mut_effect, threads]),
+            #     self._file_name.text(), 
+            #     self._file_desc.text(), 
+            #     self._file_path.text(), plots, -1, self.q, self.ID, 2)
             
             self.s_ID.append(str(self.ID) + ", matrix")
             
@@ -788,7 +807,7 @@ class mainFormat(qtWidget.QWidget):
                 8*self._sf.isChecked() + \
                 16*self._sx.isChecked()
         
-        if self._binned.isChecked():
+        if self._binned.isChecked() and fname.endswith('.txt'):
             df = external_plots.loadFile(fname)
             iClone = df['Clone number'].tolist()
             iCells = df['Cells number'].tolist()
@@ -813,9 +832,9 @@ class mainFormat(qtWidget.QWidget):
                                                         copy.deepcopy([pop, cap, steps, tau, skip, mut_prob, mut_effect, threads]), 
                                                         self._file_name.text(), 
                                                         self._file_desc.text(), 
-                                                        self._file_path.text(), plots, self._last_cycle + 1, self.q, self.ID, 1)))
+                                                        self._file_path.text(), plots, self._last_cycle, self.q, self.ID, 1)))
             self.r_ID.append(str(self.ID) + ", binned")
-        elif self._single.isChecked():
+        elif self._single.isChecked() and fname.endswith('.csv'):
             df = pd.read_csv(fname)
             iMuts = df['Mutations'].tolist()
             iClones = df['Clone'].tolist()
@@ -848,13 +867,14 @@ class mainFormat(qtWidget.QWidget):
                                                        copy.deepcopy(self.params).append(threads), 
                                                        self._file_name.text(), 
                                                        self._file_desc.text(), 
-                                                       self._file_path.text(), plots, self._last_cycle + 1, self.q, self.ID, 0)))            
+                                                       self._file_path.text(), plots, self._last_cycle, self.q, self.ID, 0)))            
             self.r_ID.append(str(self.ID) + ", single")
             
-        elif self._matrix.isChecked():
+        elif self._matrix.isChecked() and fname.endswith('.mtx'):
             df = pd.read_csv(fname)
             df = df.drop('Unnamed: 0', axis=1)
             mm = []
+            os.chdir(self._file_path.text())
             for row in df.iterrows():
                 mm.append(sc.sparse.load_npz(row[1]['Mutation matrix']))
             df['Mutation matrix'] = mm
@@ -869,6 +889,11 @@ class mainFormat(qtWidget.QWidget):
                 except ValueError:
                     df.at[i,'Uniqal passenger mutation list'] = []
                     
+                try:
+                    df.at[i,'Clone fitness'] = np.array([float(x.strip('[]')) for x in df.loc[i,'Clone fitness'].split(',')])
+                except ValueError:
+                    df.at[i,'Clone fitness'] = np.array([])
+                    
             iPop = df.to_numpy().tolist()
             
             self.status.setText("Started")
@@ -878,9 +903,16 @@ class mainFormat(qtWidget.QWidget):
             self.th_r.append(Process(target=clonalEvolutionMainLoop, args=(iPop, copy.deepcopy([pop, cap, steps, tau, skip, mut_prob, mut_effect, threads]),
                                     self._file_name.text(), 
                                     self._file_desc.text(), 
-                                    self._file_path.text(), plots, self._last_cycle + 1, self.q, self.ID, 2)))
+                                    self._file_path.text(), plots, self._last_cycle, self.q, self.ID, 2)))
+            # clonalEvolutionMainLoop(iPop, copy.deepcopy([pop, cap, steps, tau, skip, mut_prob, mut_effect, threads]),
+            #                         self._file_name.text(), 
+            #                         self._file_desc.text(), 
+            #                         self._file_path.text(), plots, self._last_cycle, self.q, self.ID, 2)
             self.r_ID.append(str(self.ID) + ", matrix")
-            
+        else:
+            self.showDialog("Wrong simulation type or wrong file!", "Alert")
+            return
+        
         self.ID = self.ID + 1
         self.th_r[self.idx_r].start()
         self.idx_r = self.idx_r + 1     
@@ -967,21 +999,24 @@ class mainFormat(qtWidget.QWidget):
             if xname.index(i) == len(xname)-1:
                 t = i.split('_')
                 t = t[len(t)-1]
-                self._last_cycle = int(''.join(x for x in t if x.isdigit()))
+                self._last_cycle = int(''.join(x for x in t if x.isdigit())) - 1
                 if i.endswith('.csv'):
-                    name = i.rstrip('_' + str(self._last_cycle) + '.csv')
+                    name = i.rstrip(str(self._last_cycle + 1) + '.csv')
                 elif i.endswith('.txt'):
-                    name = i.rstrip('_' + str(self._last_cycle) + '.txt')
+                    name = i.rstrip(str(self._last_cycle + 1) + '.txt')
+                elif i.endswith('.mtx'):
+                    name = i.rstrip(str(self._last_cycle + 1) + '.mtx')
             else:
                 path = path + i + '/'
         
-        if name.endswith("_binned"):
-            name = name.rstrip("_binned")
-        else:
-            name = name.rstrip("_single")
+        if name.endswith("_binned_"):
+            name = name.rstrip("_binned_")
+        elif name.endswith("_single_"):
+            name = name.rstrip("_single_")
+        elif name.endswith("_matrix_"):
+            name = name.rstrip("_matrix_")
         self._file_name.setText(name)
-        self._file_path.setText(path)  
-        self._file_desc.setText(str(self._last_cycle) + " - last cycle, starting with +1")                    
+        self._file_path.setText(path)                    
 
 def run():
     app = qtWidget.QApplication(sys.argv)
