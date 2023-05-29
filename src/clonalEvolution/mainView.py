@@ -44,6 +44,9 @@ import copy
 import clonalEvolution.external_plots as external_plots
 from clonalEvolution.clonal_evolution_init import clonalEvolutionMainLoop 
 
+# import external_plots as external_plots
+# from clonal_evolution_init import clonalEvolutionMainLoop 
+
 class mainFormat(qtWidget.QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -284,36 +287,27 @@ class mainFormat(qtWidget.QWidget):
         
     def mullerPlotAction(self):
         try:
-            if self._file_path.text() == "":
-                raise Exception()
             if self._th_muller.is_alive():
                 raise NameError()
         except NameError:
             self.showDialog("Plotting already", "Alert")
             return
-        except:
-            self.showDialog("Enter save path", "Alert")
-            return
+
         fname = qtWidget.QFileDialog.getOpenFileName(self, 'Open file', "Z://","CSV files (*.txt)")[0]  
         if fname == "":
             self.showDialog("No file selected!", "Alert")
             return
-        self._th_muller = (Thread(target=external_plots.mullerPlot, args=(fname, self._file_path.text() + "/Figures")))
-        # external_plots.mullerPlot(fname, self._file_path.text() + "/Figures")
+        self._th_muller = (Thread(target=external_plots.mullerPlot, args=([fname])))
+        # external_plots.mullerPlot(fname)
         self._th_muller.start()
         self.status.setText("muller plot ongoing")
         
     def cloneHistAction(self):
         try:
-            if self._file_path.text() == "":
-                raise Exception()
             if self._th_hist.is_alive():
                 raise NameError()
         except NameError:
             self.showDialog("Plotting already", "Alert")
-            return
-        except:
-            self.showDialog("Enter save path", "Alert")
             return
         fname = qtWidget.QFileDialog.getOpenFileNames(None, 'Open file', "Z://","Single data files (*.csv);; Binned data files (*.txt);; Matrix data files (*.mtx)")[0] 
         if len(fname) == 0:
@@ -323,17 +317,17 @@ class mainFormat(qtWidget.QWidget):
         for i in fname:
             name_id.append(re.findall('\d+', i)[-1])
         if all(map(lambda x: x.endswith('.txt'), fname)):
-            self._th_hist = (Thread(target=external_plots.binnedHist, args=(fname, self._file_path.text(), name_id)))
+            self._th_hist = (Thread(target=external_plots.binnedHist, args=(fname, name_id)))
             # external_plots.binnedHist(fname, self._file_path.text(), name_id)
             self._th_hist.start()
             self.status.setText("mutations histograms ongoing")
         elif all(map(lambda x: x.endswith('.csv'), fname)):
-            self._th_hist = (Thread(target=external_plots.singleHist, args=(fname, self._file_path.text(), name_id)))
+            self._th_hist = (Thread(target=external_plots.singleHist, args=(fname, name_id)))
             # external_plots.singleHist(fname, self._file_path.text(), name_id)
             self._th_hist.start()
             self.status.setText("mutations histograms ongoing")
         elif all(map(lambda x: x.endswith('.mtx'), fname)):
-            self._th_hist = (Thread(target=external_plots.matrixHist, args=(fname, self._file_path.text(), name_id)))
+            self._th_hist = (Thread(target=external_plots.matrixHist, args=(fname, name_id)))
             # external_plots.matrixHist(fname, self._file_path.text(), name_id)
             self._th_hist.start()
             self.status.setText("mutations histograms ongoing")
@@ -361,7 +355,7 @@ class mainFormat(qtWidget.QWidget):
         for i in fname:
             name_id.append(re.findall('\d+', i)[-1])
             
-        self._th_mw = (Thread(target=external_plots.mutWavePlot, args=(fname, self._file_path.text(), name_id)))
+        self._th_mw = (Thread(target=external_plots.mutWavePlot, args=(fname, name_id)))
         # external_plots.mutWavePlot(fname, self._file_path.text(), name_id)
         self._th_mw.start()
         self.status.setText("mutation wave ongoing")
@@ -387,15 +381,15 @@ class mainFormat(qtWidget.QWidget):
         for i in fname:
             name_id.append(re.findall('\d+', i)[-1])
             
-        self._th_fw = (Thread(target=external_plots.fitWavePlot, args=(fname, self._file_path.text(), name_id)))
+        self._th_fw = (Thread(target=external_plots.fitWavePlot, args=(fname, name_id)))
         # external_plots.fitWavePlot(fname, self._file_path.text(), name_id)
         self._th_fw.start()
         self.status.setText("fitness wave ongoing")
         
     def clonePlotAction(self):
         try:
-            if self._file_path.text() == "":
-                raise Exception()
+            # if self._file_path.text() == "":
+                # raise Exception()
             if self._th_cp.is_alive():
                 raise NameError()
         except NameError:
@@ -413,7 +407,7 @@ class mainFormat(qtWidget.QWidget):
         for i in fname:
             name_id.append(re.findall('\d+', i)[-1])
         
-        self._th_cp = (Thread(target=external_plots.clonePlot, args=(fname, self._file_path.text(), name_id)))
+        self._th_cp = (Thread(target=external_plots.clonePlot, args=(fname, name_id)))
         # external_plots.clonePlot(fname, self._file_path.text(), name_id)
         self._th_cp.start()
         self.status.setText("clone plot ongoing")

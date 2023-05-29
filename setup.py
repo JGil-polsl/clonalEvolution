@@ -22,7 +22,7 @@ setup(
     # specification here:
     # https://packaging.python.org/specifications/core-metadata/#name
     name="clonalEvolution", 
-    version="1.5.0",
+    version="2.0.9",
     description="Software for simulating clonal evolution in binned and tau leap version.",
     url="https://github.com/JGil-polsl/clonalEvolution",
     author="Jaroslaw Gil",  
@@ -72,7 +72,7 @@ setup(
     # executes the function `main` from this package when invoked:
     entry_points={ 
         "console_scripts": [
-            "clonaEvolution=__main__:main",
+            "clonalEvolution=__main__:main",
         ],
     },
     # List additional URLs that are relevant to your project as a dict.

@@ -19,6 +19,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy as sc
+import psutil
 import time
 import os
 import copy
@@ -30,6 +31,11 @@ import clonalEvolution.clonal_evolution_binned_loop as CEBL
 import clonalEvolution.clonal_evolution_clone_matrix_loop as CECML
 import clonalEvolution.clonal_evolution_loop as CEL
 import clonalEvolution.wmean as wm
+
+# import clonal_evolution_binned_loop as CEBL
+# import clonal_evolution_clone_matrix_loop as CECML
+# import clonal_evolution_loop as CEL
+# import wmean as wm
 
 end = False
     
@@ -396,6 +402,7 @@ def clonalEvolutionMainLoop(iPop, params, file_name="", file_description="", fil
         select - 0 normal, 1 binned
     """
     global end
+    pop = params[0]
     cap = params[1]
     steps = params[2]
     tau = params[3]
@@ -489,24 +496,36 @@ def clonalEvolutionMainLoop(iPop, params, file_name="", file_description="", fil
         print_time = not iter_inner % round(cycle/skip)   
         if print_time and plots & 16:
             tx = time.time() - tx
+            p = psutil.Process()
+            mem = p.memory_percent()
+            CPU = p.cpu_percent()
             if not os.path.exists(file_localization + '/' + "report/"  + file_name + "_report_" + str(ID) + ".txt"):
                 os.makedirs(file_localization + '/' + "report/", exist_ok=True)
                 FILE = open(file_localization + '/' + "report/"  + file_name + "_report_" + str(ID) + ".txt", 'w')
                 FILE.write("threads: %i" % threads)
                 FILE.write('\n')
-                FILE.write(str(ID) + ',' + str(tx))
+                FILE.write(str(ID) + ',' + str(tx) + ',' + str(CPU) + ',' + str(mem))
                 FILE.write('\n')
                 FILE.close()
             else:
                 FILE = open(file_localization + '/' + "report/"  + file_name + "_report_" + str(ID) + ".txt", 'a')
-                FILE.write(str(ID) + ',' + str(tx))
+                FILE.write(str(ID) + ',' + str(tx) + ',' + str(CPU) + ',' + str(mem))
                 FILE.write('\n')
                 FILE.close()
             tx = time.time()
                 
-        if iter_outer % steps == 0 and iter_outer > 0:
+        if (iter_outer % steps == 0 and iter_outer > 0):
             print('simulation ended, ID: %i' % ID)
             break
+        if select == 0: 
+            if(len(iPop)) >= 10*pop:
+                break
+        elif select == 1:
+            if(sum([row[1] for row in iPop])) >= 10*pop:
+                break
+        elif select == 2:
+            if(sum([row[1] for row in iPop])) >= 100*pop:
+                break
         
         if select == 0:            
             iPop = CEL.clonalEvolutionLoop(iPop, cap, tau, mut_prob, mut_effect, resume, q, threads)
@@ -517,5 +536,7 @@ def clonalEvolutionMainLoop(iPop, params, file_name="", file_description="", fil
             
         resume = 0
         iter_inner = iter_inner + 1
-            
-    q.put(['ended', ID])
+    if q!= None:        
+        q.put(['ended', ID])
+    else:
+        print('ended: ' + str(ID))

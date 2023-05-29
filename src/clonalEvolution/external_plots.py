@@ -22,13 +22,14 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import scipy as sc
+import matplotlib
+matplotlib.use('agg')
 
-def clonePlot(paths_in, paths_out, ids):
+def clonePlot(paths_in, ids):
     prop = np.transpose([paths_in, ids])
     for path_in, _id in prop:     
         
-        os.chdir(paths_out)
-        path_out = paths_out + '/Figures/' + _id + '/'
+        path_out = '/'.join(np.array(path_in.split('/'))[0:len(path_in.split('/'))-1]) + '/Figures/' + _id +'/'
             
         df = []
         if path_in.endswith('.csv'):
@@ -91,8 +92,7 @@ def mutWavePlot(paths_in, paths_out, ids):
     print(prop)
     for path_in, _id in prop:
         
-        os.chdir(paths_out)
-        path_out = paths_out + '/Figures/' + _id + '/'
+        path_out = '/'.join(np.array(path_in.split('/'))[0:len(path_in.split('/'))-1]) + '/Figures/' + _id +'/'
             
         df = []
         if path_in.endswith('.csv'):
@@ -144,14 +144,13 @@ def mutWavePlot(paths_in, paths_out, ids):
             print("Wrong file: %s" % path_in)
             continue        
 
-def fitWavePlot(paths_in, paths_out, ids):
+def fitWavePlot(paths_in, ids):
     prop = np.transpose([paths_in, ids])
     print("fitness")
     print(prop)
     for path_in, _id in prop:
         
-        os.chdir(paths_out)
-        path_out = paths_out + '/Figures/' + _id + '/'
+        path_out = '/'.join(np.array(path_in.split('/'))[0:len(path_in.split('/'))-1]) + '/Figures/' + _id +'/'
             
         df = []
         if path_in.endswith('.csv'):
@@ -202,7 +201,7 @@ def fitWavePlot(paths_in, paths_out, ids):
             print("Wrong file: %s" % path_in)
             continue  
 
-def mullerPlot(path_in, path_out):   
+def mullerPlot(path_in):   
     '''
     path_in - absolute path to file with .txt extension (simulation data is saved into txt file)
     path_out - absolute path to figures save localization
@@ -210,10 +209,9 @@ def mullerPlot(path_in, path_out):
     
     if not path_in.endswith('.txt'):
         print("Wrong file")
-        return
+        return   
     
-    if not path_out.endswith('/'):
-        path_out = path_out + '/'
+    path_out = '/'.join(np.array(path_in.split('/'))[0:len(path_in.split('/'))-1]) + '/Figures/'
     
     _F = open(path_in, 'r')
     _L = _F.readlines()
@@ -253,6 +251,11 @@ def mullerPlot(path_in, path_out):
     temp.extend([str(x) for x in clones])
     Population.columns = temp
     ax = Population.plot.bar(x="Generation", stacked=True, legend=False, width=1, figsize=(40,20))
+    ax.set_xticks(list(range(0,len(Population['Generation']),200)))
+    ax.set_xlabel('Generation', fontsize=50)
+    ax.set_ylabel('Cells number', fontsize=50)
+    plt.xticks(fontsize=40)
+    plt.yticks(fontsize=40)
     
     fig = ax.get_figure()
     try:
@@ -335,7 +338,7 @@ def loadFile(path):
     _f.close()
     return df
 
-def binnedHist(paths_in, paths_out, ids):
+def binnedHist(paths_in, ids):
     '''
     path_in - absolute path to file with .txt extension (binned simulation data is saved into txt file)
     path_out - absolute path to figures save localization
@@ -346,9 +349,7 @@ def binnedHist(paths_in, paths_out, ids):
             print("Wrong file")
             return
         
-        path_out = paths_out + '/Figures/' + _id
-        if not paths_out.endswith('/'):
-            path_out = path_out + '/'
+        path_out = '/'.join(np.array(path_in.split('/'))[0:len(path_in.split('/'))-1]) + '/Figures/' + _id +'/'
         
         df = loadFile(path_in)
         
@@ -493,27 +494,26 @@ def binnedHist(paths_in, paths_out, ids):
             else:
                 continue
 
-def matrixHist(paths_in, paths_out, ids):
+def matrixHist(paths_in, ids):
     '''
     path_in - absolute path to file with .txt extension (binned simulation data is saved into txt file)
     path_out - absolute path to figures save localization
     '''
     prop = np.transpose([paths_in, ids])
+    data_path = '/'.join(list(np.array(paths_in[0].split('/'))[:-1])) + '/'
     for path_in, _id in prop:    
         if not path_in.endswith('.mtx'):
             print("Wrong file")
             return
-        os.chdir(paths_out)
-        path_out = paths_out + '/Figures/' + _id
-        if not path_out.endswith('/'):
-            path_out = path_out + '/'
+        
+        path_out = '/'.join(np.array(path_in.split('/'))[0:len(path_in.split('/'))-1]) + '/Figures/' + _id +'/'
     
         df = pd.read_csv(path_in)
         
         mm = []
         for row in df.iterrows():
             try:
-                mm.append(sc.sparse.load_npz(row[1]['Mutation matrix']))
+                mm.append(sc.sparse.load_npz(data_path + row[1]['Mutation matrix']))
             except FileNotFoundError:
                 print("No data file found, check directory")
                 continue
@@ -682,7 +682,7 @@ def matrixHist(paths_in, paths_out, ids):
                 fig.savefig(path_out + "%s_clone_mutations_VAF_ID_" % _id + str(int(clone[1]['Clone number'])) +".jpg")
                 plt.close(fig)           
 
-def singleHist(paths_in, paths_out, ids):
+def singleHist(paths_in, ids):
     '''
     path_in - absolute path to file with .txt extension (binned simulation data is saved into txt file)
     path_out - absolute path to figures save localization
@@ -693,9 +693,7 @@ def singleHist(paths_in, paths_out, ids):
             print("Wrong file")
             return
         
-        path_out = paths_out + '/Figures/' + _id
-        if not path_out.endswith('/'):
-            path_out = path_out + '/'
+        path_out = '/'.join(np.array(path_in.split('/'))[0:len(path_in.split('/'))-1]) + '/Figures/' + _id +'/'
         
         filepath = Path(path_in)  
         filepath.parent.mkdir(parents=True, exist_ok=True)
@@ -816,5 +814,5 @@ def singleHist(paths_in, paths_out, ids):
                 print("saving files %.1f %%" % (i/len(clones) * 100))
             
 if __name__ == "__main__":
-    fitWavePlot(["E:\\Simulations\\Publication\\Normal Test S B M\\m3\\m3_matrix_3500.mtx"], 
-                "E:\\Simulations\\Publication\\Normal Test S B M\\m3", [3500])
+    mullerPlot("E:\\Simulations\\Publication\\Normal Test S B M\\m8\\m8_muller_plot_matrix_data.txt", 
+                "E:\\Simulations\\Publication\\Normal Test S B M\\m8\\Figures")
