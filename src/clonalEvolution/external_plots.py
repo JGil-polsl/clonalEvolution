@@ -17,13 +17,20 @@
 '''
 import pandas as pd
 import numpy as np
+import math
 import os
 from pathlib import Path
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import scipy as sc
 import matplotlib
+from matplotlib import gridspec
+import pyfish as pf
 matplotlib.use('agg')
+
+def round_up(n, decimals=0):
+    multiplier = 10**decimals
+    return math.ceil(n * multiplier) / multiplier  
 
 def clonePlot(paths_in, ids):
     prop = np.transpose([paths_in, ids])
@@ -267,6 +274,87 @@ def mullerPlot(path_in):
             os.remove(path_out + "muller_plot.jpg")
         fig.savefig(path_out + "muller_plot.jpg")
         plt.close(fig)
+
+def mullerPlotPyFish(path_in, name, limits):
+    '''
+    path_in - absolute path to file with .txt extension (simulation data is saved into txt file)
+    path_out - absolute path to figures save localization
+    '''
+    
+    if not path_in.endswith('.txt'):
+        print("Wrong file")
+        return   
+    
+    path_out = '/'.join(np.array(path_in.split('/'))[0:len(path_in.split('/'))-1]) + '/Figures/'
+    
+    _F = open(path_in, 'r')
+    _L = _F.readlines()
+    data = np.array(_L)
+    
+    population = []
+    parent_tree = []
+    init_pop = 0
+    
+    for i in range(1,len(data)):
+        line = data[i].split(')')
+        for x in line:
+            if x == '\n':
+                break
+            a = x.lstrip('(')
+            a = list(map(lambda x: int(x),a.split(',')))
+            
+            if init_pop == 0:
+                init_pop = a[1]            
+
+            population.append([a[0], i-1, a[1]])
+                
+            b = [a[2], a[0]]                                
+                                   
+            if a[0] != a[2] and b not in parent_tree:
+                parent_tree.append(b)
+        
+    population.sort()
+    parent_tree.sort()
+    population = pd.DataFrame(population, columns=["Id", "Step", "Pop"])
+    parent_tree = pd.DataFrame(parent_tree, columns=["ParentId", "ChildId"])
+    
+    parents = parent_tree["ParentId"].unique()
+    children = parent_tree["ChildId"].unique()
+    root_list = np.setdiff1d(parents, children)
+    
+    while len(root_list) > 1:
+        for i in range(1,len(root_list)):
+            parIdx = parent_tree[parent_tree['ParentId'] == root_list[i]].index
+            popIdx = population[population['Id'] == root_list[i]].index       
+            
+            parent_tree = parent_tree.drop(parIdx)
+            population = population.drop(popIdx)
+            
+        parents = parent_tree["ParentId"].unique()
+        children = parent_tree["ChildId"].unique()
+        root_list = np.setdiff1d(parents, children)
+    
+    last = max(population["Step"])
+    first = int(limits * last)   
+    if first == last:
+        first = 0
+    if first != 0:
+        name = name + "_zoomed_"
+    else:
+        name = name + "_original_"
+    
+    data = pf.process_data(population, parent_tree, absolute=True, first_step=first, last_step=last)
+    pf.setup_figure(absolute=True)
+    pf.fish_plot(*data)
+    
+    try:
+        os.makedirs(path_out, exist_ok=True) 
+    except OSError as error:
+        print(error)
+    finally:
+        if os.path.exists(path_out + "%smuller_plot.jpg" % name):
+            os.remove(path_out + "%smuller_plot.jpg" % name)
+        plt.savefig(path_out + "%smuller_plot.jpg" % name)       
 
 def VAFdecode_ar(iMutations, pop):
     VAF = []
@@ -544,9 +632,9 @@ def matrixHist(paths_in, ids):
         for i in df['Driver mutation list']:
             pIDs.extend(i)
         pIDs = np.unique(pIDs).tolist()
-        pFreq = np.array([np.zeros(len(pIDs)) for x in range(len(df)+1)])
+        pFreq = np.array([np.zeros((len(pIDs), 2)) for x in range(len(df))])
         
-        for i in range(len(pFreq)-1):
+        for i in range(len(pFreq)):
             muts = df['Uniqal passenger mutation list'][i] 
             driv = df['Driver mutation list'][i]
             freqs = df['Mutation matrix'][i]
@@ -554,14 +642,122 @@ def matrixHist(paths_in, ids):
             muts = np.array(muts)[0:len(freqs)].tolist()
             for m in muts:
                 a = freqs[muts.index(m)]     
-                pFreq[i,pIDs.index(m)] = a    
+                pFreq[i,pIDs.index(m),0] = a    
             for m in driv:
                 a = df['Cells number'][i]
-                pFreq[i,pIDs.index(m)] = a
+                pFreq[i,pIDs.index(m),1] = a
         
-        for i in range(len(pFreq[0,:])):
-            pFreq[len(pFreq[:,0])-1,i] = sum(pFreq[:,i])
+        # for i in range(len(pFreq[0,:])):
+        #     pFreq[len(pFreq[:,0])-1,i] = sum(pFreq[:,i])
+        log = False
         
+        for i in range(len(pFreq)):
+            data = pFreq[i,:,:]   
+            a = data[:,0] != 0
+            b = data[:,1] != 0
+            data = data / df['Cells number'][i]
+            
+            gs = gridspec.GridSpec(2, 4)
+            fig = plt.figure(figsize=(60,30))
+            
+            ax1 = plt.subplot(gs[:, 0:3])
+            bins = ax1.hist(data[a,0], bins=100, range=[0,1], log=log)
+            ax1.hist(data[b,1], bins=bins[1], bottom=bins[0], log=log)
+            # plt.ylim(0, round_up(max(bins[0]), -2))
+            
+            ax2 = plt.subplot(gs[0,3])
+            bins = ax2.hist(data[a,0], bins=100, range=[0,0.2], log=log)
+            ax2.hist(data[b,1], bins=bins[1], bottom=bins[0], log=log)
+            # plt.ylim(0, round_up(max(bins[0]), -2))
+            
+            ax3 = plt.subplot(gs[1,3])
+            bins = ax3.hist(data[a,0], bins=100, range=[0.8,1], log=log)
+            ax3.hist(data[b,1], bins=bins[1], bottom=bins[0], log=log)
+            # plt.ylim(0, round_up(max(bins[0]), -2))
+            
+            try:
+                os.makedirs(path_out, exist_ok=True) 
+            except OSError as error:
+                print(error)
+            finally:
+                if os.path.exists(path_out + "%s_clone_mutations_VAF_ID_" % _id + str(int(df['Clone number'][i])) +".jpg"):
+                    os.remove(path_out + "%s_clone_mutations_VAF_ID_" % _id + str(int(df['Clone number'][i])) +".jpg")
+                fig.savefig(path_out + "%s_clone_mutations_VAF_ID_" % _id + str(int(df['Clone number'][i])) +".jpg")
+                plt.close(fig)   
+        
+        cell_count = np.sum(df['Cells number'])
+        data = np.sum(np.sum(pFreq, axis=2), axis=0) / cell_count
+        pFreq = np.sum(pFreq, axis=2)
+        pFreq = pFreq[:,data!=0]
+        data = data[data!=0]
+        
+        idx = np.ceil(data*100) - 1
+        
+        percentage = np.zeros((len(df), 100))
+        for i in range(len(data)):
+            percentage[:,int(idx[i])] = percentage[:,int(idx[i])] + pFreq[:,i]        
+        percentage = percentage / np.sum(percentage, axis=0)
+        percentage[np.isnan(percentage)] = 0
+        a = df['Cells number'].to_numpy().argsort()
+        
+        percentage = percentage[a[::-1]]
+        gs = gridspec.GridSpec(2, 4)
+        fig = plt.figure(figsize=(60,30))
+        
+        ax1 = plt.subplot(gs[:, 0:3])
+        bins = ax1.hist(data, bins=100, range=[0,1], log=log)
+        ax1.bar((bins[1][:-1] + bins[1][1:])/2, bins[0] * percentage[0], width=0.01)
+        for i in range(1,len(percentage[:,0])):
+            ax1.bar((bins[1][:-1] + bins[1][1:])/2, bins[0] * percentage[i], bottom = bins[0] * np.sum(percentage[:i], axis=0), width=0.01)
+        # plt.ylim(0, round_up(max(bins[0]), -2))
+        
+        idx = np.ceil(data*500) - 1
+        percentage = np.zeros((len(df), 100))
+        for i in range(len(data)):
+            if data[i] <= 0.2 and idx[i] < 100:
+                percentage[:,int(idx[i])] = percentage[:,int(idx[i])] + pFreq[:,i]
+        percentage = percentage / np.sum(percentage, axis=0)
+        percentage[np.isnan(percentage)] = 0
+        a = df['Cells number'].to_numpy().argsort()
+        percentage = percentage[a[::-1]]
+        
+        ax2 = plt.subplot(gs[0,3])
+        bins = ax2.hist(data, bins=100, range=[0,0.2], log=log)
+        ax2.bar((bins[1][:-1] + bins[1][1:])/2, bins[0] * percentage[0], width=0.002)
+        for i in range(1,len(percentage[:,0])):
+            ax2.bar((bins[1][:-1] + bins[1][1:])/2, bins[0] * percentage[i], bottom = bins[0] * np.sum(percentage[:i], axis=0), width=0.002)
+        # plt.ylim(0, round_up(max(bins[0]), -2))
+        
+        idx = np.ceil(data*500) - 1
+        percentage = np.zeros((len(df), 100))
+        for i in range(len(data)):
+            if data[i] >=0.8 and idx[i] >= 400:
+                percentage[:,int(idx[i])-400] = percentage[:,int(idx[i])-400] + pFreq[:,i]
+        percentage = percentage / np.sum(percentage, axis=0)
+        percentage[np.isnan(percentage)] = 0
+        a = df['Cells number'].to_numpy().argsort()
+        percentage = percentage[a[::-1]]
+        
+        ax3 = plt.subplot(gs[1,3])
+        bins = ax3.hist(data, bins=100, range=[0.8,1], log=log)
+        ax3.bar((bins[1][:-1] + bins[1][1:])/2, bins[0] * percentage[0], width=0.002)
+        for i in range(1,len(percentage[:,0])):
+            ax3.bar((bins[1][:-1] + bins[1][1:])/2, bins[0] * percentage[i], bottom = bins[0] * np.sum(percentage[:i], axis=0), width=0.002)
+        # plt.ylim(0, round_up(max(bins[0]), -2))
+        
+        try:
+            os.makedirs(path_out, exist_ok=True) 
+        except OSError as error:
+            print(error)
+        finally:
+            if os.path.exists(path_out + "%s_clone_mutations_VAF_ID" % _id +".jpg"):
+                os.remove(path_out + "%s_clone_mutations_VAF_ID" % _id +".jpg")
+            fig.savefig(path_out + "%s_clone_mutations_VAF_ID" % _id +".jpg")
+            plt.close(fig)  
+
+                
+        
+        '''
         pFreq = pFreq.T
         pFreq = pFreq[pFreq[:,len(pFreq[0,:])-1] != 0]
         pFreq = pFreq.T
@@ -681,6 +877,7 @@ def matrixHist(paths_in, ids):
                     os.remove(path_out + "%s_clone_mutations_VAF_ID_" % _id + str(int(clone[1]['Clone number'])) +".jpg")
                 fig.savefig(path_out + "%s_clone_mutations_VAF_ID_" % _id + str(int(clone[1]['Clone number'])) +".jpg")
                 plt.close(fig)           
+'''       
 
 def singleHist(paths_in, ids):
     '''
@@ -812,7 +1009,52 @@ def singleHist(paths_in, ids):
                 fig.savefig(path_out + "%s_clone_mutations_VAF_ID_" % _id + str(clones[i]) +".jpg")
                 plt.close(fig)
                 print("saving files %.1f %%" % (i/len(clones) * 100))
+       
+def cloneDist(path_in, name=""):
+    if not path_in.endswith('.txt'):
+        print("Wrong file")
+        return   
+    
+    path_out = '/'.join(np.array(path_in.split('/'))[0:len(path_in.split('/'))-1]) + '/Figures/'
+    
+    _F = open(path_in, 'r')
+    _L = _F.readlines()
+    data = np.array(_L)
+    
+    clones = []
+    time = 0
+    for i in range(1,len(data)):
+        line = data[i].split(')')
+        num = 0
+        for x in line:
+            if x == '\n':
+                if clones == []:
+                    clones = np.array([np.array([time, num])])
+                else:
+                    clones = np.append(clones, [np.array([time, num])], axis=0)
+                time = time + 1
+                break
+            num = num + 1
             
+    fig = plt.figure(figsize=(40,20))
+    ax1 = plt.subplot(211)
+    ax1.bar(clones[:,0], clones[:,1], width=1)
+    
+    ax2 = plt.subplot(212)
+    ax2.scatter(clones[:,0], clones[:,1])
+                
+    try:
+        os.makedirs(path_out, exist_ok=True) 
+    except OSError as error:
+        print(error)
+    finally:
+        if os.path.exists(path_out + "%sclone_dist.jpg" % name):
+            os.remove(path_out + "%sclone_dist.jpg" % name)
+        plt.savefig(path_out + "%sclone_dist.jpg" % name)    
+       
 if __name__ == "__main__":
-    mullerPlot("E:\\Simulations\\Publication\\Normal Test S B M\\m8\\m8_muller_plot_matrix_data.txt", 
-                "E:\\Simulations\\Publication\\Normal Test S B M\\m8\\Figures")
+    a = np.array(os.listdir("E:/Doktorat/Dane/SimData/DiffParams"))[np.array(list(map(lambda x: x.endswith(".txt"), os.listdir("E:/Doktorat/Dane/SimData/DiffParams"))))]
+    for i in a:
+        cloneDist("E:/Doktorat/Dane/SimData/DiffParams/" + i, i.rstrip("muller_plot_matrix_data.txt"))
+        mullerPlotPyFish("E:/Doktorat/Dane/SimData/DiffParams/" + i, i.rstrip("muller_plot_matrix_data.txt") + "zoomed_", 0)
+    # matrixHist(["E:/Doktorat/Dane/SimData/New/negative_5_matrix_6930.mtx", "E:/Doktorat/Dane/SimData/New/positive_6_matrix_4470.mtx", "E:/Doktorat/Dane/SimData/New/neutral_5_matrix_9960.mtx"], ["6930", "4470", "9960"])

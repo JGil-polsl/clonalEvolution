@@ -362,41 +362,47 @@ def main():
 
 def adminMode():
     p = np.array(sys.argv)
-    N = p[int(np.where(p == '-N')[0][0]) + 1]        
-    N = np.array(list(map(lambda x: int(x), N.split(','))))   
-    N = 10**np.array(range(N[0],N[1]+1,N[2]))     
+    # N = p[int(np.where(p == '-N')[0][0]) + 1]        
+    # N = np.array(list(map(lambda x: int(x), N.split(','))))   
+    # N = 10**np.array(range(N[0],N[1]+1,N[2]))     
 
-    s = p[int(np.where(p == '-S')[0][0]) + 1]        
-    sx = np.array(list(map(lambda x: float(x), s.split(','))))   
-    s = np.arange(0,sx[1],sx[2])  
-    s[0] = sx[0]
-    if(sx[0] != sx[1]):
-        s = np.append(s,sx[1])                 
+    # s = p[int(np.where(p == '-S')[0][0]) + 1]        
+    # sx = np.array(list(map(lambda x: float(x), s.split(','))))   
+    # s = np.arange(0,sx[1],sx[2])  
+    # s[0] = sx[0]
+    # if(sx[0] != sx[1]):
+    #     s = np.append(s,sx[1])                 
         
-    f = p[int(np.where(p == '-F')[0][0]) + 1]        
-    fx = np.array(list(map(lambda x: float(x), f.split(','))))   
-    f = np.arange(0,fx[1],fx[2])  
-    f[0] = fx[0]
-    if(fx[0] != fx[1]):
-        f = np.append(f,fx[1])          
+    # f = p[int(np.where(p == '-F')[0][0]) + 1]        
+    # fx = np.array(list(map(lambda x: float(x), f.split(','))))   
+    # f = np.arange(0,fx[1],fx[2])  
+    # f[0] = fx[0]
+    # if(fx[0] != fx[1]):
+    #     f = np.append(f,fx[1])          
 
-    ps = p[int(np.where(p == '-PS')[0][0]) + 1]        
-    psx = np.array(list(map(lambda x: float(x), ps.split(','))))   
-    ps = np.arange(0,psx[1],psx[2])  
-    ps[0] = psx[0]
-    if(psx[0] != psx[1]):
-        ps = np.append(ps,psx[1])                 
+    # ps = p[int(np.where(p == '-PS')[0][0]) + 1]        
+    # psx = np.array(list(map(lambda x: float(x), ps.split(','))))   
+    # ps = np.arange(0,psx[1],psx[2])  
+    # ps[0] = psx[0]
+    # if(psx[0] != psx[1]):
+    #     ps = np.append(ps,psx[1])                 
         
-    pf = p[int(np.where(p == '-PF')[0][0]) + 1]        
-    pfx = np.array(list(map(lambda x: float(x), pf.split(','))))   
-    pf = np.arange(0,pfx[1],pfx[2])  
-    pf[0] = pfx[0]
-    if(pfx[0] != pfx[1]):
-        pf = np.append(pf,pfx[1])   
+    # pf = p[int(np.where(p == '-PF')[0][0]) + 1]        
+    # pfx = np.array(list(map(lambda x: float(x), pf.split(','))))   
+    # pf = np.arange(0,pfx[1],pfx[2])  
+    # pf[0] = pfx[0]
+    # if(pfx[0] != pfx[1]):
+    #     pf = np.append(pf,pfx[1])   
+    
+    N = np.array([10000])
+    f = np.array([0.02, 0.02])
+    s = np.array([0, -0.001])
+    pf = np.array([0.0005, 0.0005])
+    ps = np.array([0.01, 0.01])
     
     if len(pf) == len(ps) and len(ps) == len(f) and len(f) == len(s):
         effects = np.array([s,f,ps,pf])
-        tau,step,ct,multiply,kind,path,save,save_p = [0.005,10000,50,10,0,'',0,0]
+        tau,step,ct,multiply,kind,path,save,save_p,end = [0.005,10000,50,10,0,'',0,0,10]
 
         try:
             tau = float(p[int(np.where(p == '-t')[0][0]) + 1])
@@ -413,7 +419,11 @@ def adminMode():
         try:
             multiply = int(p[int(np.where(p == '-x')[0][0]) + 1])  
         except:
-            WrongParameter() 
+            WrongParameter()             
+        try:
+            end = int(p[int(np.where(p == '-end')[0][0]) + 1])
+        except:
+            WrongParameter()
         
         kind = 0 + 1*bool(len(p[p=='-binned'])) + 2*bool(len(p[p=='-matrix']))
         path = ''
@@ -429,53 +439,58 @@ def adminMode():
         percent_max = len(N) * len(s)
         percent = 0
         processes = []
-        for mul in range(multiply):
-            for i in N:                
-                pop = i
-                cap = i
-                for sx,fx,psx,pfx in effects.T:
-                    percent = percent + 1
-                    name = 'single' * (kind == 0) + 'binned' * (kind == 1) + 'matrix' * (kind == 2)
-                    pathout = path + '/' + str(mul) + '_' + name + '_' + str(i) + '/probability_' + str(psx) + '_' + str(pfx) + '/effect_'  + str(sx) + '_' + str(fx) + '/'
-                    params = copy.deepcopy([pop, cap, step, tau, ct, [pfx, psx], [fx, sx], 8])   
-                    
-                    if save_p:
-                        dfp = pd.DataFrame({
-                                'pop': pop,
-                                'cap': cap,
-                                'steps': step,
-                                'tau': tau,
-                                'skip': ct,
-                                'mut_effect': [[fx, sx]],
-                                'mut_prob': [[pfx, psx]],
-                                'threads': 8
-                            }, index=[0])
+        for w in range(2):
+            for i in N:   
+                for mul in range(multiply):                         
+                    pop = i
+                    cap = i
+                    for sx,fx,psx,pfx in effects.T:
+                        percent = percent + 1
+                        name = 'single' * (kind == 0) + 'binned' * (kind == 1) + 'matrix' * (kind == 2)
+                        pathout = path + '/' + str(w*25 + mul) + '_' + name + '_' + str(i) + '/probability_' + str(psx) + '_' + str(pfx) + '/effect_'  + str(sx) + '_' + str(fx) + '/'
+                        params = copy.deepcopy([pop, cap, step, tau, ct, [pfx, psx], [fx, sx], 8])   
                         
-                        filepath = Path(pathout + '/params'  + ".csv")  
-                        filepath.parent.mkdir(parents=True, exist_ok=True)  
-                        dfp.to_csv(filepath)  
-                    pr = 0
-                    if kind == 1:
-                        iPop = [[0, pop, 1, 0, [], [], 0]]
-                        pr = (Process(target=CEML.clonalEvolutionMainLoop, args=(iPop, params, name, "", pathout, save, -1, None, percent, kind)))
-                    elif kind == 2:
-                        iPop = [[0, pop, [], [0], sc.sparse.csr_matrix(np.array([[0] for x in range(pop)])), np.ones(pop), 0]]                    
-                        pr = (Process(target=CEML.clonalEvolutionMainLoop, args=(iPop, params, name, "", pathout, save, -1, None, percent, kind)))
-                    else:
-                        iMuts = np.zeros(pop, dtype=np.int64).tolist()
-                        iProp = np.ones(pop).tolist()
-                        iClones = np.zeros(pop, dtype=np.int64).tolist()
-                        iMutations = [[] for x in range(len(iMuts))]
-                        iEffect =[[] for x in range(len(iMuts))]  
-                        
-                        iPop = np.array([copy.deepcopy(iMuts), copy.deepcopy(iProp), copy.deepcopy(iClones), copy.deepcopy(iMutations), copy.deepcopy(iEffect), copy.deepcopy(iClones)]).T.tolist()
-                        pr = (Process(target=CEML.clonalEvolutionMainLoop, args=(iPop, params, name, "", pathout, save, -1, None, percent, kind)))
-                        # CEML.clonalEvolutionMainLoop(iPop, params, name, "", pathout, save, -1, None, percent, kind)
-                    pr.start()
-                    print(str(round(percent/percent_max,3)*100) + '%')
-                    processes.append(pr)
-        for pr in processes:
-            pr.join()
+                        if save_p:
+                            dfp = pd.DataFrame({
+                                    'pop': pop,
+                                    'cap': cap,
+                                    'steps': step,
+                                    'tau': tau,
+                                    'skip': ct,
+                                    'mut_effect': [[fx, sx]],
+                                    'mut_prob': [[pfx, psx]],
+                                    'threads': 8
+                                }, index=[0])
+                            
+                            filepath = Path(pathout + '/params'  + ".csv")  
+                            filepath.parent.mkdir(parents=True, exist_ok=True)  
+                            dfp.to_csv(filepath)  
+                        pr = 0
+                        if kind == 1:
+                            iPop = [[0, pop, 1, 0, [], [], 0]]
+                            pr = (Process(target=CEML.clonalEvolutionMainLoop, args=(iPop, params, name, "", pathout, save, -1, None, percent, kind, end)))
+                        elif kind == 2:
+                            iPop = [[0, pop, [], [0], sc.sparse.csr_matrix(np.array([[0] for x in range(pop)])), np.ones(pop), 0]]                    
+                            pr = (Process(target=CEML.clonalEvolutionMainLoop, args=(iPop, params, name, "", pathout, save, -1, None, percent, kind, end)))
+                        else:
+                            iMuts = np.zeros(pop, dtype=np.int64).tolist()
+                            iProp = np.ones(pop).tolist()
+                            iClones = np.zeros(pop, dtype=np.int64).tolist()
+                            iMutations = [[] for x in range(len(iMuts))]
+                            iEffect =[[] for x in range(len(iMuts))]  
+                            
+                            iPop = np.array([copy.deepcopy(iMuts), copy.deepcopy(iProp), copy.deepcopy(iClones), copy.deepcopy(iMutations), copy.deepcopy(iEffect), copy.deepcopy(iClones)]).T.tolist()
+                            pr = (Process(target=CEML.clonalEvolutionMainLoop, args=(iPop, params, name, "", pathout, save, -1, None, percent, kind, end)))
+                            # CEML.clonalEvolutionMainLoop(iPop, params, name, "", pathout, save, -1, None, percent, kind)
+                        pr.start()
+                        print(str(round(percent/percent_max,3)*100) + '%')
+                        processes.append(pr)
+                for pr in processes:
+                    pr.join()
+                active = True
+                while active:
+                    ax = list(map(lambda x: x.is_alive(), processes))
+                    active = any(ax)
     else:
         print('s, f, ps and pf vectors should be same size')
         

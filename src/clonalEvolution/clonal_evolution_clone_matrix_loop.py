@@ -14,6 +14,8 @@ ty = [0,0,0,0]
 sem_mutations = True
 sem_clone = True
 
+sgn = lambda x: -1 * (x < 0) + 1 * (x > 0) 
+
 '''
     Cellular/Microbial Clonal Evolution simulations basing on Gillespie algorithm.
     Copyright (C) 2022 by Jarosław Gil
@@ -114,7 +116,7 @@ def newMutation(clone, passenger, mut_effect):
     (c,d) = clone[4]._shape
     clone[4][range(a,c,1), range(b,d,1)] = 1
     clone[1] = clone[1] + len(fit)
-    clone[5] = np.append(clone[5], fit/(1-mut_effect[1]))
+    clone[5] = np.append(clone[5], fit * (1 + abs(mut_effect[1]))**sgn(mut_effect[1]))
 
 def oneCloneCycle(i, iPop, tau, mdt, mut_prob, mut_effect, print_time):
     death = np.random.exponential(1, i[1])/mdt

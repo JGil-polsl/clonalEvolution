@@ -63,6 +63,7 @@ class mainFormat(qtWidget.QWidget):
         self._th_mw = Thread()
         self._th_fw = Thread()
         self._th_cp = Thread()
+        self._th_cd = Thread()
         self.createMainView()
         self._monitor = True
         self.th_monitor = Thread(target=self.monitor, args=(self.q, self.status))
@@ -174,6 +175,11 @@ class mainFormat(qtWidget.QWidget):
                 self._th_cp.join(1)   
                 if not self._th_cp.is_alive():                 
                     self.status.setText("clone plot done")
+                    # self._th_cp = None
+            if self._th_cd.is_alive():
+                self._th_cd.join(1)   
+                if not self._th_cd.is_alive():                 
+                    self.status.setText("clone distribution done")
                     # self._th_cp = None
                 
     def closeEvent(self, event):
@@ -292,15 +298,39 @@ class mainFormat(qtWidget.QWidget):
         except NameError:
             self.showDialog("Plotting already", "Alert")
             return
+        
+        try:
+            limits = float(self._msg.text())
+        except:
+            limits = 0
 
         fname = qtWidget.QFileDialog.getOpenFileName(self, 'Open file', "Z://","CSV files (*.txt)")[0]  
         if fname == "":
             self.showDialog("No file selected!", "Alert")
             return
-        self._th_muller = (Thread(target=external_plots.mullerPlot, args=([fname])))
-        # external_plots.mullerPlot(fname)
+        name = np.array(np.array(fname.split('/'))[-1].split('_'))[0]
+        self._th_muller = (Thread(target=external_plots.mullerPlotPyFish, args=([fname, name, limits])))
+        # external_plots.mullerPlotPyFish(fname, name, limits)
         self._th_muller.start()
         self.status.setText("muller plot ongoing")
+        
+    def cloneDistributionAction(self):
+        try:
+            if self._th_cd.is_alive():
+                raise NameError()
+        except NameError:
+            self.showDialog("Plotting already", "Alert")
+            return
+
+        fname = qtWidget.QFileDialog.getOpenFileName(self, 'Open file', "Z://","CSV files (*.txt)")[0]  
+        if fname == "":
+            self.showDialog("No file selected!", "Alert")
+            return
+        name = np.array(np.array(fname.split('/'))[-1].split('_'))[0]
+        self._th_cd = (Thread(target=external_plots.cloneDist, args=([fname, name])))
+        # external_plots.mullerPlotPyFish(fname, name, limits)
+        self._th_cd.start()
+        self.status.setText("clone distribution ongoing")
         
     def cloneHistAction(self):
         try:
@@ -436,6 +466,8 @@ class mainFormat(qtWidget.QWidget):
             _threadTab.addRow(qtWidget.QLabel("fitness wave"), qtWidget.QLabel()) 
         if self._th_cp.is_alive():
             _threadTab.addRow(qtWidget.QLabel("clone plot"), qtWidget.QLabel()) 
+        if self._th_cd.is_alive():
+            _threadTab.addRow(qtWidget.QLabel("clone distribution"), qtWidget.QLabel()) 
             
         self.threadTab.setLayout(_threadTab)
         return self.threadTab        
@@ -473,6 +505,9 @@ class mainFormat(qtWidget.QWidget):
         _clone_plot = qtWidget.QPushButton(self)
         _clone_plot.setText('Clone plot')
         _clone_plot.clicked.connect(self.clonePlotAction)
+        _clone_dist = qtWidget.QPushButton(self)
+        _clone_dist.setText('Clone distribution plot')
+        _clone_dist.clicked.connect(self.cloneDistributionAction)
         
         _file_instr_fn = qtWidget.QLabel()
         _file_instr_fn.setText('File name - one cycle file name will appear with cycle number')
@@ -502,6 +537,8 @@ class mainFormat(qtWidget.QWidget):
         _generalTab.addWidget(_fit_wave, row, 0, 1, 3)
         row = row + 1
         _generalTab.addWidget(_clone_plot, row, 0, 1, 3)
+        row = row + 1
+        _generalTab.addWidget(_clone_dist, row, 0, 1, 3)
         row = row + 1
         _generalTab.addWidget(_file_instr_fd, row, 0, 1, 3)
         row = row + 1
@@ -546,7 +583,7 @@ class mainFormat(qtWidget.QWidget):
         self._capacity.setValidator(qtGui.QIntValidator(0, 10**7))
         
         self._steps = qtWidget.QLineEdit(str(100))
-        self._steps.setValidator(qtGui.QIntValidator(0, 10**5))
+        # self._steps.setValidator(qtGui.QIntValidator(0, 10**5))
         
         self._tau = qtWidget.QLineEdit(str(0.005))     
         self._tau.setValidator(qtGui.QDoubleValidator(0.000, 1.000, 3))
@@ -683,7 +720,14 @@ class mainFormat(qtWidget.QWidget):
         try:
             pop = int(self._population.text())
             cap = int(self._capacity.text())
-            steps = int(self._steps.text())
+            steps = self._steps.text()
+            if ',' in steps:
+                steps = steps.split(',')
+                if steps[1] == 'pop':
+                    self.end_condition = int(steps[0])
+                    steps = -1
+            else:
+                steps = int(steps[0])
             tau = float(self._tau.text())
             skip = float(self._skip.text())
             mut_prob = self._mut_prob.text().split(',')
@@ -758,7 +802,7 @@ class mainFormat(qtWidget.QWidget):
                 copy.deepcopy([pop, cap, steps, tau, skip, mut_prob, mut_effect, threads]),
                 self._file_name.text(), 
                 self._file_desc.text(), 
-                self._file_path.text(), plots, -1, self.q, self.ID, 2)))
+                self._file_path.text(), plots, -1, self.q, self.ID, 2, self.end_condition)))
             # clonalEvolutionMainLoop(
             #     iPop, 
             #     copy.deepcopy([pop, cap, steps, tau, skip, mut_prob, mut_effect, threads]),

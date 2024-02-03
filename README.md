@@ -6,7 +6,7 @@ Python software for simulating celluar/microbial clonal evolution with Gillespie
 
 The simpliest installation:
 ```
-python -m pip install microbialClonalEvolution
+python -m pip install clonalEvolution
 ```
 
 Usage in python:
@@ -98,15 +98,3 @@ GNU GENERAL PUBLIC LICENSE  Version 3, 29 June 2007
 # Author
 
 Jarosław Gil, Silesian Univeristy of Technology, Department of Computer Graphics, Vision and Digital Systems.
-
-# Changelog
-
-v1.0.0 - Working single cell algorithm, binned algorithm \
-v1.1.0 - fixes \
-v1.1.5 - fixes \
-v1.2.0 - Added matrix algorithm, process solution (instead of thred, one simulation wokring as new process - much faster) \
-v1.3.0 - Changed matrix algorithm for more precise caluclations (still warnings and errors can occure) \
-v1.3.5 - Added time reporting, fixes for matrix algorithm \
-v1.4.0 - Added plotting methods: fitness wave, clone plot, mutation wave. Fixed VAF histograms method \
-v1.4.5 - Fixes in threading management \
-v1.5.0 - Working threading management, plotting

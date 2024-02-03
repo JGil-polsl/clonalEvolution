@@ -37,6 +37,7 @@ import clonalEvolution.wmean as wm
 # import clonal_evolution_loop as CEL
 # import wmean as wm
 
+
 end = False
     
 def waveMut_ar(iMuts, iClones, cln):
@@ -360,7 +361,7 @@ def plotter(plots, iPop, file_name, file_localization, iter_outer, select):
             # saveMatrixData(df, file_localization, file_name + '_matrix', copy.copy(iter_outer))
             tsf.start()
 
-def clonalEvolutionMainLoop(iPop, params, file_name="", file_description="", file_localization="", plots=0, t_iter=-1, q=None, ID=0, select=0):
+def clonalEvolutionMainLoop(iPop, params, file_name="", file_description="", file_localization="", plots=0, t_iter=-1, q=None, ID=0, select=0, end_p=100):
     """
     Main simulation loop
         iPop: population array where row is in form of: 
@@ -416,6 +417,7 @@ def clonalEvolutionMainLoop(iPop, params, file_name="", file_description="", fil
     iter_outer = t_iter
     resume = 0 + 1*(t_iter>0)
     cycle = round(skip/tau)
+    _exit = False
     
     try:
         os.makedirs(file_localization + '/', exist_ok=True) 
@@ -446,7 +448,7 @@ def clonalEvolutionMainLoop(iPop, params, file_name="", file_description="", fil
     while 1:
         
         ## Data for muller plot
-        if iter_inner % (cycle/skip) == 0 or begin:
+        if iter_inner % (cycle/skip) == 0 or begin or _exit:
             if select == 0 and not begin and plots & 16:
                 FILE = open(file_localization + '/' + file_name + "_muller_plot_single_data.txt", 'a')
                 _CLONES = []
@@ -476,7 +478,7 @@ def clonalEvolutionMainLoop(iPop, params, file_name="", file_description="", fil
             iter_outer = iter_outer + 1
             
             ## Save data, plots
-            if iter_outer % skip == 0 or begin:
+            if iter_outer % skip == 0 or begin or _exit:
                 begin = 0
                 t = time.time() - t  
                 
@@ -491,6 +493,7 @@ def clonalEvolutionMainLoop(iPop, params, file_name="", file_description="", fil
                 command(queue_data, q, select, iPop, ID, iter_outer, iter_inner, tau, skip, cycle, file_localization, file_name)
 
         if end:
+            print('simulation ended, ID: %i' % ID)
             break
 
         print_time = not iter_inner % round(cycle/skip)   
@@ -514,18 +517,22 @@ def clonalEvolutionMainLoop(iPop, params, file_name="", file_description="", fil
                 FILE.close()
             tx = time.time()
                 
-        if (iter_outer % steps == 0 and iter_outer > 0):
-            print('simulation ended, ID: %i' % ID)
-            break
+        if (steps != -1):
+            if(iter_outer % steps == 0 and iter_outer > 0):
+                print('simulation ended, ID: %i' % ID)
+                break;
         if select == 0: 
-            if(len(iPop)) >= 10*pop:
-                break
+            if(len(iPop)) >= end_p*pop:
+                _exit = True
+                end = True
         elif select == 1:
-            if(sum([row[1] for row in iPop])) >= 10*pop:
-                break
+            if(sum([row[1] for row in iPop])) >= end_p*pop:
+                _exit = True
+                end = True
         elif select == 2:
-            if(sum([row[1] for row in iPop])) >= 100*pop:
-                break
+            if(sum([row[1] for row in iPop])) >= end_p*pop:
+                _exit = True
+                end = True
         
         if select == 0:            
             iPop = CEL.clonalEvolutionLoop(iPop, cap, tau, mut_prob, mut_effect, resume, q, threads)
