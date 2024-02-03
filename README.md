@@ -11,7 +11,7 @@ python -m pip install clonalEvolution
 
 Usage in python:
 ```
-from microbialClonalEvolution import mainView
+from clonalEvolution import mainView
 mainView.run()
 ```
 
