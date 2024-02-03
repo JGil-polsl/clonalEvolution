@@ -4,3 +4,4 @@ dist/*
 src/clonalEvolution.*
 src/clonalEvolution/__pycache__/*
 .spyproject/*
+build.bat
